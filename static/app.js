@@ -20,6 +20,8 @@ const ICONS = {
   bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>',
+  energy: '<path d="M13 2 4 14h6l-1 8 9-12h-6z"/>',
+  megaphone: '<path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M14 8.5a4 4 0 0 1 0 7"/>',
 };
 function icon(name) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ''}</svg>`;
@@ -116,6 +118,36 @@ const MODULES = {
     columns: [['title', '事项'], ['due_date', '截止日', 'expire'], ['module', '归属'], ['done', '完成', 'bool']],
     fields: [F('title', '事项', { req: 1, full: 1 }), F('due_date', '截止日期', { type: 'date' }), F('module', '归属模块'), F('done', '已完成', { type: 'bool', def: 0 }), F('notes', '备注', { full: 1 })],
   },
+  energy_reading: {
+    title: '能耗台账', table: 'energy_reading', icon: '⚡',
+    columns: [['period', '所属期'], ['energy_type', '能源'], ['campus', '院区/计量点'], ['consumption', '用量', 'num'], ['unit', '单位'], ['unit_price', '单价', 'num'], ['amount', '费用', 'money'], ['notes', '备注']],
+    fields: [
+      F('period', '所属期(如2026-07)', { req: 1 }),
+      F('energy_type', '能源类型', { type: 'select', options: ['电', '水', '天然气', '蒸汽', '热力', '其他'], req: 1 }),
+      F('campus', '院区/计量点', { def: '万寿路27号院' }),
+      F('prev_reading', '上期读数', { type: 'number' }), F('curr_reading', '本期读数', { type: 'number' }),
+      F('consumption', '用量(留空自动算)', { type: 'number' }),
+      F('unit', '计量单位', { type: 'select', options: ['度', '吨', '立方米', '吉焦(GJ)', '千瓦时', '其他'] }),
+      F('unit_price', '单价(元/单位)', { type: 'number' }),
+      F('amount', '费用(留空自动算)', { type: 'number' }),
+      F('notes', '备注', { full: 1 }),
+    ],
+    hint: '录入上期/本期读数后，用量留空系统自动计算；填了用量与单价、费用留空也会自动计算。每月能耗与费用汇总见「能耗汇总」。',
+  },
+  energy_activity: {
+    title: '节能宣传与联络', table: 'energy_activity', icon: '📣',
+    columns: [['date', '日期'], ['category', '类别'], ['title', '事项/活动'], ['org', '对接单位'], ['contact', '联系人'], ['status', '状态', 'status']],
+    fields: [
+      F('date', '日期', { type: 'date' }),
+      F('category', '类别', { type: 'select', options: ['联络对接', '宣传活动', '材料报送', '培训', '检查', '其他'] }),
+      F('title', '事项/活动名称', { req: 1, full: 1 }),
+      F('org', '对接单位', { def: '工信部机关服务局节能处' }),
+      F('contact', '联系人/电话'),
+      F('status', '状态', { type: 'select', options: ['计划', '进行中', '已完成'], def: '计划' }),
+      F('notes', '内容/备注', { full: 1 }),
+    ],
+    attach: 1,
+  },
 };
 
 const NAV = [
@@ -123,6 +155,7 @@ const NAV = [
   { group: '车辆与司机', items: [['trip_record', '行车记录', 'Trip Records', 'trip'], ['subsidy', '司机补助', 'Subsidies', 'subsidy'], ['driver', '司机档案', 'Drivers', 'driver'], ['vehicle', '车辆档案', 'Vehicles', 'vehicle']] },
   { group: '房产与用房', items: [['room', '用房分配', 'Rooms', 'room'], ['permit', '出入证/车证', 'Permits', 'permit']] },
   { group: '合同与费用', items: [['contract', '合同管理', 'Contracts', 'contract'], ['fee_bill', '费用缴纳', 'Fees', 'fee']] },
+  { group: '节能改造', items: [['energy_summary', '能耗汇总', 'Energy Summary', 'energy'], ['energy_reading', '能耗台账', 'Energy Ledger', 'energy'], ['energy_activity', '节能宣传', 'Energy Programs', 'megaphone']] },
   { group: '事务', items: [['todo', '待办事项', 'Tasks', 'todo'], ['settings', '系统设置', 'Settings', 'settings']] },
 ];
 
@@ -131,6 +164,7 @@ const KICKER = {
   dashboard: 'OVERVIEW', trip_record: 'TRIP RECORDS', subsidy: 'DRIVER SUBSIDIES',
   driver: 'DRIVERS', vehicle: 'VEHICLES', room: 'ROOMS', permit: 'PERMITS',
   contract: 'CONTRACTS', fee_bill: 'FEES', todo: 'TASKS', settings: 'SETTINGS',
+  energy_summary: 'ENERGY SUMMARY', energy_reading: 'ENERGY LEDGER', energy_activity: 'ENERGY PROGRAMS',
 };
 function setTitle(key, cn) {
   const h = $('#page-title');
@@ -168,6 +202,7 @@ function route() {
   renderNav(key);
   if (key === 'dashboard') return viewDashboard();
   if (key === 'subsidy') return viewSubsidy();
+  if (key === 'energy_summary') return viewEnergySummary();
   if (key === 'settings') return viewSettings();
   if (MODULES[key]) return viewModule(key);
   viewDashboard();
@@ -236,7 +271,7 @@ function cellHtml(r, col) {
   if (t === 'bool') return v ? '<span class="tag ok">是</span>' : '<span class="tag">否</span>';
   if (t === 'num') return `<td class="num">${v == null ? '' : v}</td>`;
   if (t === 'money') return `<td class="num">${v == null ? '' : money(v)}</td>`;
-  if (t === 'status') { const cls = v === '有效' || v === '履行中' ? 'ok' : (v === '作废' || v === '已结束' ? '' : 'warn'); return `<span class="tag ${cls}">${esc(v)}</span>`; }
+  if (t === 'status') { const cls = v === '有效' || v === '履行中' || v === '已完成' ? 'ok' : (v === '作废' || v === '已结束' ? '' : 'warn'); return `<span class="tag ${cls}">${esc(v)}</span>`; }
   if (t === 'paid') return v ? '<span class="tag ok">已缴</span>' : '<span class="tag warn">未缴</span>';
   if (t === 'expire') return expireCell(v);
   return esc(v);
@@ -414,6 +449,41 @@ async function adjustSubsidy(rec, y, mo, after) {
     else await api.post('/subsidy_month', { driver_id: rec.driver_id, year: y, month: mo, other_amount: oa, other_note: on });
     toast('已保存'); close(); after();
   };
+}
+
+/* ---------- 能耗汇总（特殊视图） ---------- */
+async function viewEnergySummary() {
+  setTitle('energy_summary', '能耗汇总');
+  const now = new Date();
+  let period = viewEnergySummary._p || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  viewEnergySummary._p = period;
+  $('#topbar-actions').innerHTML = '';
+  const view = $('#view');
+  const render = async () => {
+    view.innerHTML = '<div class="empty">加载中…</div>';
+    const d = await api.get('/energy/summary?period=' + encodeURIComponent(period));
+    const rows = d.rows.length ? d.rows.map(r => `<tr>
+      <td>${esc(r.energy_type)}</td>
+      <td class="num">${r.consumption}</td>
+      <td class="num">${money(r.amount)}</td>
+      <td class="num">${r.cnt}</td>
+    </tr>`).join('') : `<tr><td colspan="4"><div class="empty">该月暂无能耗记录，请先在「能耗台账」录入</div></td></tr>`;
+    view.innerHTML = `
+      <div class="toolbar">
+        <label>所属期：</label>
+        <input type="month" id="ep" value="${period}" style="width:160px">
+        <button class="btn" id="ego">查看</button>
+        <div class="spacer"></div>
+        <span class="hint" style="margin:0">用量单位随能源类型而不同；费用为该月合计</span>
+      </div>
+      <div class="panel"><div class="panel-b"><div style="overflow-x:auto"><table>
+        <thead><tr><th>能源类型</th><th class="num">用量合计</th><th class="num">费用合计</th><th class="num">记录数</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td style="text-align:right"><b>费用总计</b></td><td class="num"></td><td class="num"><b>${money(d.total_amount)}</b></td><td class="num"></td></tr></tfoot>
+      </table></div></div></div>`;
+    $('#ego').onclick = () => { viewEnergySummary._p = $('#ep').value || period; viewEnergySummary(); };
+  };
+  render();
 }
 
 /* ---------- 系统设置 ---------- */

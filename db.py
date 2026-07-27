@@ -137,6 +137,34 @@ CREATE TABLE IF NOT EXISTS fee_bill (
     notes       TEXT
 );
 
+-- ============ 模块四：节能改造 ============
+-- 能耗台账（每月每能源品类一行；用量可由起止读数自动算，费用可由用量×单价自动算）
+CREATE TABLE IF NOT EXISTS energy_reading (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    period       TEXT NOT NULL,       -- 所属期 YYYY-MM
+    energy_type  TEXT NOT NULL,       -- 电/水/天然气/蒸汽/热力/其他
+    campus       TEXT,                -- 院区 / 计量点
+    prev_reading REAL,                -- 上期读数
+    curr_reading REAL,                -- 本期读数
+    consumption  REAL,                -- 用量（可自动=本期-上期）
+    unit         TEXT,                -- 计量单位（度/吨/立方米/GJ...）
+    unit_price   REAL,                -- 单价（元/单位）
+    amount       REAL,                -- 费用（可自动=用量×单价）
+    notes        TEXT
+);
+
+-- 节能宣传与联络（与上级机关对接、材料报送、宣传活动台账）
+CREATE TABLE IF NOT EXISTS energy_activity (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    date     TEXT,                    -- 日期
+    category TEXT,                    -- 联络对接/宣传活动/材料报送/培训/检查/其他
+    title    TEXT NOT NULL,           -- 事项 / 活动名称
+    org      TEXT,                    -- 对接单位（如 工信部机关服务局节能处）
+    contact  TEXT,                    -- 联系人 / 电话
+    status   TEXT DEFAULT '计划',     -- 计划/进行中/已完成
+    notes    TEXT
+);
+
 -- ============ 待办 / 附件 ============
 CREATE TABLE IF NOT EXISTS todo (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,

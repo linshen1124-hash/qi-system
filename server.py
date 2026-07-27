@@ -34,6 +34,9 @@ TABLES = {
     "fee_bill": ["contract_id", "category", "period", "amount", "due_date",
                  "paid", "paid_date", "notes"],
     "todo":     ["title", "due_date", "done", "module", "notes"],
+    "energy_reading": ["period", "energy_type", "campus", "prev_reading", "curr_reading",
+                       "consumption", "unit", "unit_price", "amount", "notes"],
+    "energy_activity": ["date", "category", "title", "org", "contact", "status", "notes"],
 }
 
 
@@ -82,6 +85,17 @@ def list_subsidy(year, month):
         m["driver_name"] = d["name"]
         out.append(subsidy_amount(m))
     return out
+
+
+def energy_summary(period):
+    """按能源类型汇总某月的用量与费用。period 形如 2026-07。"""
+    rows = db.rows(
+        "SELECT energy_type, COALESCE(SUM(consumption),0) consumption, "
+        "COALESCE(SUM(amount),0) amount, COUNT(*) cnt "
+        "FROM energy_reading WHERE period=? GROUP BY energy_type ORDER BY energy_type",
+        (period,))
+    total = round(sum(r["amount"] or 0 for r in rows), 2)
+    return {"period": period, "rows": rows, "total_amount": total}
 
 
 def get_reminders():
@@ -197,6 +211,9 @@ class Handler(BaseHTTPRequestHandler):
                 y = int(q.get("year", [date.today().year])[0])
                 m = int(q.get("month", [date.today().month])[0])
                 return self._json(list_subsidy(y, m))
+            if p == "/api/energy/summary":
+                per = q.get("period", [date.today().strftime("%Y-%m")])[0]
+                return self._json(energy_summary(per))
             if p == "/api/attachment":
                 ent = q.get("entity", [""])[0]
                 eid = q.get("id", [0])[0]
@@ -297,19 +314,36 @@ class Handler(BaseHTTPRequestHandler):
             r["driver_name"] = dmap.get(r["driver_id"], "")
             r["plate"] = vmap.get(r["vehicle_id"], "")
 
+    @staticmethod
+    def _derive_fields(table, data):
+        """按表补算派生字段（留空才算）。create/update 共用。"""
+        def num(x):
+            try:
+                return float(x)
+            except (TypeError, ValueError):
+                return None
+        if table == "trip_record":
+            s, e = num(data.get("start_km")), num(data.get("end_km"))
+            if s is not None and e is not None and not data.get("km"):
+                data["km"] = e - s
+        elif table == "energy_reading":
+            pv, cv = num(data.get("prev_reading")), num(data.get("curr_reading"))
+            if pv is not None and cv is not None and not data.get("consumption"):
+                data["consumption"] = cv - pv
+            cons, price = num(data.get("consumption")), num(data.get("unit_price"))
+            if cons is not None and price is not None and not data.get("amount"):
+                data["amount"] = round(cons * price, 2)
+
     def _create(self, table, data):
+        self._derive_fields(table, data)
         cols = [c for c in TABLES[table] if c in data]
-        if table == "trip_record" and data.get("start_km") not in (None, "") \
-                and data.get("end_km") not in (None, "") and not data.get("km"):
-            data["km"] = float(data["end_km"]) - float(data["start_km"])
-            if "km" not in cols:
-                cols.append("km")
         vals = [data[c] for c in cols]
         ph = ",".join("?" * len(cols))
         nid = db.run(f"INSERT INTO {table}({','.join(cols)}) VALUES({ph})", vals)
         return {"id": nid}
 
     def _update(self, table, rid, data):
+        self._derive_fields(table, data)
         cols = [c for c in TABLES[table] if c in data]
         if not cols:
             return {"id": rid}
