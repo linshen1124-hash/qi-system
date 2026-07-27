@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Trip Records - QI SYSTEM</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Hanken+Grotesk:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#23005c",
+                        "tertiary-fixed": "#58ffa5",
+                        "surface-container-low": "#f1f3ff",
+                        "outline-variant": "#dbc2ad",
+                        "accent-neon": "#00FF99",
+                        "on-surface-variant": "#554434",
+                        "on-error": "#ffffff",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "surface-dim": "#d4daea",
+                        "surface-deep": "#7A32FF",
+                        "on-tertiary-fixed": "#00210f",
+                        "on-primary-fixed-variant": "#693c00",
+                        "on-secondary": "#ffffff",
+                        "outline": "#887361",
+                        "surface-bright": "#f9f9ff",
+                        "error": "#ba1a1a",
+                        "secondary-container": "#7b34ff",
+                        "surface-container": "#e8eefe",
+                        "surface-container-high": "#e3e8f9",
+                        "surface": "#f9f9ff",
+                        "secondary": "#6100e1",
+                        "tertiary-container": "#00cb79",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed": "#2c1600",
+                        "text-on-secondary": "#FFFFFF",
+                        "primary-container": "#ff9900",
+                        "on-tertiary-container": "#004f2c",
+                        "primary-fixed-dim": "#ffb86f",
+                        "on-error-container": "#93000a",
+                        "tertiary": "#006d3e",
+                        "on-secondary-container": "#eee4ff",
+                        "surface-tint": "#8a5100",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#dde2f3",
+                        "on-secondary-fixed-variant": "#5600ca",
+                        "on-background": "#161c27",
+                        "surface-container-lowest": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "primary": "#8a5100",
+                        "on-tertiary-fixed-variant": "#00522e",
+                        "page-bg": "#FF9900",
+                        "tertiary-fixed-dim": "#00e388",
+                        "inverse-surface": "#2a303d",
+                        "surface-variant": "#dde2f3",
+                        "secondary-fixed": "#e9ddff",
+                        "status-warning": "#E0A400",
+                        "on-surface": "#161c27",
+                        "inverse-primary": "#ffb86f",
+                        "primary-fixed": "#ffdcbd",
+                        "inverse-on-surface": "#ecf0ff",
+                        "on-primary-container": "#653a00",
+                        "status-error": "#E5484D",
+                        "text-on-primary": "#1E2430",
+                        "background": "#f9f9ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "card-gap": "24px",
+                        "inner-padding": "24px",
+                        "section-padding": "64px",
+                        "container-margin": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Anton"],
+                        "headline-lg": ["Anton"],
+                        "label-md": ["JetBrains Mono"],
+                        "headline-lg-mobile": ["Anton"],
+                        "body-md": ["Hanken Grotesk"],
+                        "stats-display": ["Anton"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "headline-md": ["Anton"]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["24px", { "lineHeight": "32px", "fontWeight": "400" }],
+                        "headline-lg": ["84px", { "lineHeight": "90px", "letterSpacing": "-0.02em", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["48px", { "lineHeight": "52px", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "22px", "fontWeight": "400" }],
+                        "stats-display": ["36px", { "lineHeight": "40px", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "500" }],
+                        "headline-md": ["48px", { "lineHeight": "56px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom scrollbar for chunky feel */
+        ::-webkit-scrollbar { width: 12px; }
+        ::-webkit-scrollbar-track { background: #FF9900; }
+        ::-webkit-scrollbar-thumb { background: #161c27; border: 2px solid #FF9900; border-radius: 6px; }
+    </style>
+</head>
+<body class="bg-page-bg font-body-md text-body-md text-on-background antialiased h-screen overflow-hidden flex selection:bg-accent-neon selection:text-on-background">
+<!-- Shared Component: SideNavBar -->
+<nav class="h-screen w-72 fixed left-0 top-0 flex flex-col border-r-4 border-on-background bg-secondary shadow-[8px_0px_0px_0px_rgba(0,0,0,1)] py-8 z-50">
+<!-- Header -->
+<div class="px-6 mb-8 flex flex-col items-start gap-4">
+<img alt="QI System Logo" class="w-16 h-16 rounded-full border-2 border-on-background object-cover" data-alt="A stylized, high-contrast, pop-art inspired avatar logo for QI System, featuring bold geometric shapes in neon green and deep violet against a bright white background, conveying energetic modern logistics." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQ3CglDv8myGdvBntOzZuQlD9WOJ-VXGLjLNPn-vutngI-7oI6H6DYA2Ht8xLc4mlbsN9FmQyvyDZnYXb53eUYKANS8cvaNYZL38fcDzzil1lJ8BNVH4XPLvOmjhXKjsROSNvTCXxFZIqni6PQZlcC4FNSePOkubQlWSd6y48frDWef25-d-OtDbkc_Rmn0OF8lbRSaamgqDQaERx-4bLO2O0z0ljiD1sr3O9l3O01ft_05v5YO4kWbM-wVjhMtAA8zSKiRSUe6Fg"/>
+<div>
+<h1 class="font-headline-md text-headline-md text-text-on-secondary tracking-tighter">QI LOGISTICS</h1>
+<p class="font-label-md text-label-md text-text-on-secondary/80 mt-1 uppercase">Global Ops v2.1</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<div class="flex-1 flex flex-col gap-2 mt-4 overflow-y-auto">
+<!-- Dashboard -->
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined text-[24px]">dashboard</span>
+<span class="font-label-md text-label-md uppercase">Dashboard</span>
+</a>
+<!-- Inventory -->
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined text-[24px]">inventory_2</span>
+<span class="font-label-md text-label-md uppercase">Inventory</span>
+</a>
+<!-- Shipments -->
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined text-[24px]">local_shipping</span>
+<span class="font-label-md text-label-md uppercase">Shipments</span>
+</a>
+<!-- Fleet (Active Tab for Trip Records) -->
+<a class="bg-accent-neon text-on-secondary-fixed rounded-none border-l-8 border-on-background px-6 py-4 flex items-center gap-4 hover:translate-x-2 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined text-[24px]">directions_bus</span>
+<span class="font-label-md text-label-md uppercase">Fleet</span>
+</a>
+<!-- Analytics -->
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined text-[24px]">leaderboard</span>
+<span class="font-label-md text-label-md uppercase">Analytics</span>
+</a>
+<!-- Team -->
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined text-[24px]">group</span>
+<span class="font-label-md text-label-md uppercase">Team</span>
+</a>
+</div>
+<!-- CTA & Footer -->
+<div class="px-6 mt-auto flex flex-col gap-4">
+<button class="w-full bg-surface-deep text-text-on-secondary font-headline-sm text-headline-sm py-3 rounded-full border-4 border-on-background hover:scale-95 transition-transform duration-100 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">add</span>
+                New Dispatch
+            </button>
+<div class="flex flex-col gap-1 pt-4 border-t-4 border-on-background/20 mt-4">
+<a class="text-text-on-secondary/80 px-4 py-2 flex items-center gap-4 hover:bg-secondary-container rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">help</span>
+<span class="font-label-md text-label-md uppercase">Support</span>
+</a>
+<a class="text-text-on-secondary/80 px-4 py-2 flex items-center gap-4 hover:bg-secondary-container rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">logout</span>
+<span class="font-label-md text-label-md uppercase">Logout</span>
+</a>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="ml-72 w-full h-full overflow-y-auto bg-page-bg flex flex-col relative z-10">
+<!-- Shared Component: TopNavBar -->
+<header class="flex justify-between items-center w-full max-w-[1440px] mx-auto pt-4 px-8 bg-transparent flat no shadows z-20">
+<!-- Left aligned Brand/Search Area -->
+<div class="flex items-center gap-8">
+<span class="font-headline-sm text-headline-sm font-black text-on-background">QI SYSTEM</span>
+<!-- Search bar on left logic -->
+<div class="relative hidden lg:block">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-background">search</span>
+<input class="bg-surface-container-lowest border-4 border-on-background rounded-full pl-12 pr-6 py-2 font-body-md text-body-md text-on-background focus:outline-none focus:ring-4 focus:ring-accent-neon w-64" placeholder="Search records..." type="text"/>
+</div>
+</div>
+<!-- Trailing Icons & Profile -->
+<div class="flex items-center gap-6">
+<button class="text-on-background hover:text-accent-neon transition-colors hover:scale-95 duration-100 relative">
+<span class="material-symbols-outlined text-[28px]">notifications</span>
+<span class="absolute top-0 right-0 w-3 h-3 bg-status-error rounded-full border-2 border-on-background"></span>
+</button>
+<button class="text-on-background hover:text-accent-neon transition-colors hover:scale-95 duration-100">
+<span class="material-symbols-outlined text-[28px]">settings</span>
+</button>
+<div class="w-12 h-12 rounded-full border-4 border-on-background overflow-hidden cursor-pointer hover:scale-95 duration-100 bg-surface-container-lowest">
+<img alt="Administrator Profile" class="w-full h-full object-cover" data-alt="A brightly lit, stylized portrait of a logistics administrator in a modern office, characterized by pop-art vibrant colors, deep shadows, and high contrast, serving as a profile avatar." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCCjBi77HkAypfJN-LKas3ZRfevfGkuMY-iRIyQtvqCUd-eLe-qvvCYb2HCAgqH5uzRdkB16LN8dj4cJXdCMfqG9PObqsbI8jokvQ74Qknm2a46oYTzDxaxWgut5pAGVVfmdMx14Gjl0OSYyrQPEYsiXuWNdM0_Cl78QtXJaCkyZZ1X-ENjGMZ6DIVSYrcbuv3s1Co0R8p-RR_5vB3Q0AiRH6A6bJBOna9P-SwvW62V31nHLNjTZ745ZZuvpLBsVCtHGHdNCM1a0WQ"/>
+</div>
+</div>
+</header>
+<!-- Page Content Canvas -->
+<div class="w-full max-w-[1440px] mx-auto px-8 py-section-padding flex-1 flex flex-col">
+<!-- Page Header -->
+<div class="flex justify-between items-end mb-12">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-background drop-shadow-[4px_4px_0px_#161c27] mb-2">TRIP RECORDS</h2>
+<p class="font-body-lg text-body-lg text-on-background font-bold max-w-xl">Monitor active routes, review historical telemetry, and manage driver logs across the global fleet network.</p>
+</div>
+<button class="bg-accent-neon text-on-background font-headline-sm text-headline-sm px-8 py-4 rounded-full border-4 border-on-background hover:scale-95 transition-transform shadow-[4px_4px_0px_0px_rgba(22,28,39,1)] flex items-center gap-2 h-fit active:translate-y-1 active:shadow-none">
+<span class="material-symbols-outlined">add</span>
+                    New Entry
+                </button>
+</div>
+<!-- Filters Section -->
+<section class="bg-surface-container-lowest border-4 border-on-background rounded-xl p-inner-padding mb-card-gap shadow-[8px_8px_0px_0px_rgba(22,28,39,1)] relative z-10">
+<div class="flex flex-wrap gap-6 items-end">
+<div class="flex flex-col gap-2 flex-1 min-w-[200px]">
+<label class="font-label-md text-label-md text-on-background uppercase tracking-widest">Date Range</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-background">calendar_today</span>
+<input class="w-full bg-surface border-2 border-on-background rounded-full pl-12 pr-4 py-3 font-body-lg text-body-lg focus:outline-none focus:ring-4 focus:ring-accent-neon hover:bg-surface-dim transition-colors cursor-pointer" type="text" value="Oct 12 - Oct 19, 2023"/>
+</div>
+</div>
+<div class="flex flex-col gap-2 flex-1 min-w-[200px]">
+<label class="font-label-md text-label-md text-on-background uppercase tracking-widest">Driver Name</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-background">person</span>
+<input class="w-full bg-surface border-2 border-on-background rounded-full pl-12 pr-4 py-3 font-body-lg text-body-lg focus:outline-none focus:ring-4 focus:ring-accent-neon" placeholder="Search driver..." type="text"/>
+</div>
+</div>
+<div class="flex flex-col gap-2 flex-1 min-w-[200px]">
+<label class="font-label-md text-label-md text-on-background uppercase tracking-widest">Department</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-background">domain</span>
+<select class="w-full bg-surface border-2 border-on-background rounded-full pl-12 pr-10 py-3 font-body-lg text-body-lg focus:outline-none focus:ring-4 focus:ring-accent-neon appearance-none cursor-pointer">
+<option>All Departments</option>
+<option>Heavy Freight</option>
+<option>Local Delivery</option>
+<option>Interstate</option>
+</select>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-background pointer-events-none">expand_more</span>
+</div>
+</div>
+<button class="bg-surface-deep text-on-secondary font-headline-sm text-headline-sm px-8 py-3 rounded-full border-4 border-on-background hover:scale-95 transition-transform h-[56px] flex items-center justify-center min-w-[120px]">
+                        FILTER
+                    </button>
+</div>
+</section>
+<!-- Data Table Section -->
+<section class="bg-surface-container-lowest border-4 border-on-background rounded-xl p-6 shadow-[12px_12px_0px_0px_rgba(22,28,39,1)] flex-1 overflow-hidden flex flex-col">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-sm text-headline-sm text-on-background">RECENT TRIPS</h3>
+<button class="text-on-background font-label-md text-label-md uppercase border-b-2 border-on-background pb-1 hover:text-accent-neon hover:border-accent-neon transition-colors flex items-center gap-1">
+                        Export CSV <span class="material-symbols-outlined text-[16px]">download</span>
+</button>
+</div>
+<div class="overflow-x-auto flex-1">
+<table class="w-full border-separate border-spacing-y-2">
+<thead>
+<tr class="bg-surface-deep text-text-on-secondary font-headline-sm text-headline-sm uppercase tracking-wide">
+<th class="p-4 text-left border-4 border-on-background rounded-l-xl">Date</th>
+<th class="p-4 text-left border-y-4 border-r-4 border-on-background">Driver</th>
+<th class="p-4 text-left border-y-4 border-r-4 border-on-background">Vehicle ID</th>
+<th class="p-4 text-left border-y-4 border-r-4 border-on-background">Route</th>
+<th class="p-4 text-right border-y-4 border-r-4 border-on-background">Total KM</th>
+<th class="p-4 text-right border-y-4 border-r-4 border-on-background">OT Hrs</th>
+<th class="p-4 text-center border-y-4 border-r-4 border-on-background rounded-r-xl">Status</th>
+</tr>
+</thead>
+<tbody class="font-body-lg text-body-lg text-on-background font-medium">
+<!-- Row 1 -->
+<tr class="group hover:bg-surface-variant/50 transition-colors cursor-pointer">
+<td class="p-4 border-y-2 border-l-2 border-on-background/20 rounded-l-xl group-hover:border-on-background/50 bg-surface">19 Oct, 08:30</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-container border-2 border-on-background flex items-center justify-center font-headline-sm text-headline-sm text-on-background text-[14px]">MC</div>
+                                    Marcus Chen
+                                </td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface font-label-md text-label-md">HV-992-B</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface">Port Node Alpha → Hub City</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface text-right font-stats-display text-stats-display text-[24px]">428</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface text-right">1.5</td>
+<td class="p-4 border-y-2 border-r-2 border-on-background/20 rounded-r-xl group-hover:border-on-background/50 bg-surface text-center">
+<span class="inline-flex items-center justify-center bg-accent-neon text-on-background font-label-md text-label-md px-3 py-1 rounded-full border-2 border-on-background uppercase">Completed</span>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="group hover:bg-surface-variant/50 transition-colors cursor-pointer">
+<td class="p-4 border-y-2 border-l-2 border-on-background/20 rounded-l-xl group-hover:border-on-background/50 bg-surface-variant">19 Oct, 09:15</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface-variant flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed-dim border-2 border-on-background flex items-center justify-center font-headline-sm text-headline-sm text-on-background text-[14px]">SJ</div>
+                                    Sarah Jenkins
+                                </td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface-variant font-label-md text-label-md">LD-441-A</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface-variant">Urban Dist 4 → Sector 9</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface-variant text-right font-stats-display text-stats-display text-[24px]">112</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface-variant text-right">-</td>
+<td class="p-4 border-y-2 border-r-2 border-on-background/20 rounded-r-xl group-hover:border-on-background/50 bg-surface-variant text-center">
+<span class="inline-flex items-center justify-center bg-tertiary-fixed text-on-background font-label-md text-label-md px-3 py-1 rounded-full border-2 border-on-background uppercase">Active</span>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="group hover:bg-surface-variant/50 transition-colors cursor-pointer">
+<td class="p-4 border-y-2 border-l-2 border-on-background/20 rounded-l-xl group-hover:border-on-background/50 bg-surface">18 Oct, 18:45</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-fixed border-2 border-on-background flex items-center justify-center font-headline-sm text-headline-sm text-on-background text-[14px]">DR</div>
+                                    David Reyes
+                                </td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface font-label-md text-label-md">HV-102-C</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface">North Facility → Border Station</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface text-right font-stats-display text-stats-display text-[24px]">890</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface text-right font-bold text-status-error">4.0</td>
+<td class="p-4 border-y-2 border-r-2 border-on-background/20 rounded-r-xl group-hover:border-on-background/50 bg-surface text-center">
+<span class="inline-flex items-center justify-center bg-status-warning text-on-background font-label-md text-label-md px-3 py-1 rounded-full border-2 border-on-background uppercase">Delayed</span>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="group hover:bg-surface-variant/50 transition-colors cursor-pointer">
+<td class="p-4 border-y-2 border-l-2 border-on-background/20 rounded-l-xl group-hover:border-on-background/50 bg-surface-variant">18 Oct, 14:20</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface-variant flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-outline-variant border-2 border-on-background flex items-center justify-center font-headline-sm text-headline-sm text-on-background text-[14px]">AK</div>
+                                    Aisha Khan
+                                </td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface-variant font-label-md text-label-md">LD-229-B</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface-variant">Central Hub → East Depot</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface-variant text-right font-stats-display text-stats-display text-[24px]">245</td>
+<td class="p-4 border-y-2 border-on-background/20 group-hover:border-on-background/50 bg-surface-variant text-right">0.5</td>
+<td class="p-4 border-y-2 border-r-2 border-on-background/20 rounded-r-xl group-hover:border-on-background/50 bg-surface-variant text-center">
+<span class="inline-flex items-center justify-center bg-accent-neon text-on-background font-label-md text-label-md px-3 py-1 rounded-full border-2 border-on-background uppercase">Completed</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="mt-6 flex justify-between items-center border-t-4 border-on-background/10 pt-4">
+<span class="font-label-md text-label-md text-on-background/70 uppercase">Showing 1-4 of 128 Records</span>
+<div class="flex gap-2">
+<button class="w-10 h-10 rounded-full border-2 border-on-background bg-surface flex items-center justify-center hover:bg-accent-neon transition-colors disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-10 h-10 rounded-full border-2 border-on-background bg-surface flex items-center justify-center hover:bg-accent-neon transition-colors">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</section>
+</div>
+</main>
+</body></html>

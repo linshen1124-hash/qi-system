@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>QI SYSTEM - Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Hanken+Grotesk:wght@400;500&amp;family=JetBrains+Mono:wght@600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#23005c",
+                        "tertiary-fixed": "#58ffa5",
+                        "surface-container-low": "#f1f3ff",
+                        "outline-variant": "#dbc2ad",
+                        "accent-neon": "#00FF99",
+                        "on-surface-variant": "#554434",
+                        "on-error": "#ffffff",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "surface-dim": "#d4daea",
+                        "surface-deep": "#7A32FF",
+                        "on-tertiary-fixed": "#00210f",
+                        "on-primary-fixed-variant": "#693c00",
+                        "on-secondary": "#ffffff",
+                        "outline": "#887361",
+                        "surface-bright": "#f9f9ff",
+                        "error": "#ba1a1a",
+                        "secondary-container": "#7b34ff",
+                        "surface-container": "#e8eefe",
+                        "surface-container-high": "#e3e8f9",
+                        "surface": "#f9f9ff",
+                        "secondary": "#6100e1",
+                        "tertiary-container": "#00cb79",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed": "#2c1600",
+                        "text-on-secondary": "#FFFFFF",
+                        "primary-container": "#ff9900",
+                        "on-tertiary-container": "#004f2c",
+                        "primary-fixed-dim": "#ffb86f",
+                        "on-error-container": "#93000a",
+                        "tertiary": "#006d3e",
+                        "on-secondary-container": "#eee4ff",
+                        "surface-tint": "#8a5100",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#dde2f3",
+                        "on-secondary-fixed-variant": "#5600ca",
+                        "on-background": "#161c27",
+                        "surface-container-lowest": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "primary": "#8a5100",
+                        "on-tertiary-fixed-variant": "#00522e",
+                        "page-bg": "#FF9900",
+                        "tertiary-fixed-dim": "#00e388",
+                        "inverse-surface": "#2a303d",
+                        "surface-variant": "#dde2f3",
+                        "secondary-fixed": "#e9ddff",
+                        "status-warning": "#E0A400",
+                        "on-surface": "#161c27",
+                        "inverse-primary": "#ffb86f",
+                        "primary-fixed": "#ffdcbd",
+                        "inverse-on-surface": "#ecf0ff",
+                        "on-primary-container": "#653a00",
+                        "status-error": "#E5484D",
+                        "text-on-primary": "#1E2430",
+                        "background": "#f9f9ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "card-gap": "24px",
+                        "inner-padding": "24px",
+                        "section-padding": "64px",
+                        "container-margin": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Anton"],
+                        "headline-lg": ["Anton"],
+                        "label-md": ["JetBrains Mono"],
+                        "headline-lg-mobile": ["Anton"],
+                        "body-md": ["Hanken Grotesk"],
+                        "stats-display": ["Anton"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "headline-md": ["Anton"]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["24px", { "lineHeight": "32px", "fontWeight": "400" }],
+                        "headline-lg": ["84px", { "lineHeight": "90px", "letterSpacing": "-0.02em", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["48px", { "lineHeight": "52px", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "22px", "fontWeight": "400" }],
+                        "stats-display": ["36px", { "lineHeight": "40px", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "500" }],
+                        "headline-md": ["48px", { "lineHeight": "56px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .hard-shadow {
+            box-shadow: 8px 8px 0px 0px rgba(22,28,39,1);
+        }
+    </style>
+</head>
+<body class="bg-page-bg font-body-md text-body-md text-on-background min-h-screen flex overflow-x-hidden">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col h-screen w-72 fixed left-0 top-0 bg-secondary border-r-4 border-on-background shadow-[8px_0px_0px_0px_rgba(0,0,0,1)] py-8 z-50">
+<div class="px-6 pb-8">
+<h1 class="font-headline-md text-headline-md text-text-on-secondary tracking-tighter">QI LOGISTICS</h1>
+<p class="font-label-md text-label-md text-text-on-secondary/80 mt-1 uppercase">Global Ops v2.1</p>
+<button class="mt-8 w-full bg-accent-neon text-on-background font-headline-sm text-headline-sm py-3 px-4 rounded-full border-4 border-on-background hard-shadow hover:translate-x-1 hover:-translate-y-1 hover:shadow-[12px_12px_0px_0px_rgba(22,28,39,1)] transition-all flex items-center justify-center gap-2 uppercase tracking-wide">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+                New Dispatch
+            </button>
+</div>
+<div class="flex-1 overflow-y-auto">
+<ul class="flex flex-col font-label-md text-label-md">
+<li>
+<a class="bg-accent-neon text-on-secondary-fixed rounded-none border-l-8 border-on-background px-6 py-4 flex items-center gap-4 uppercase" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                        Dashboard
+                    </a>
+</li>
+<li>
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200 uppercase" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+                        Inventory
+                    </a>
+</li>
+<li>
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200 uppercase" href="#">
+<span class="material-symbols-outlined">local_shipping</span>
+                        Shipments
+                    </a>
+</li>
+<li>
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200 uppercase" href="#">
+<span class="material-symbols-outlined">directions_bus</span>
+                        Fleet
+                    </a>
+</li>
+<li>
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200 uppercase" href="#">
+<span class="material-symbols-outlined">leaderboard</span>
+                        Analytics
+                    </a>
+</li>
+<li>
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200 uppercase" href="#">
+<span class="material-symbols-outlined">group</span>
+                        Team
+                    </a>
+</li>
+</ul>
+</div>
+<div class="px-6 pt-4 border-t-4 border-on-background/20 mt-auto">
+<ul class="flex flex-col font-label-md text-label-md">
+<li>
+<a class="text-text-on-secondary/80 py-3 flex items-center gap-4 hover:translate-x-2 transition-transform duration-200 uppercase" href="#">
+<span class="material-symbols-outlined">help</span>
+                        Support
+                    </a>
+</li>
+<li>
+<a class="text-text-on-secondary/80 py-3 flex items-center gap-4 hover:translate-x-2 transition-transform duration-200 uppercase" href="#">
+<span class="material-symbols-outlined">logout</span>
+                        Logout
+                    </a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-72 flex flex-col min-h-screen">
+<!-- TopNavBar -->
+<header class="w-full pt-4 px-8 bg-transparent flex justify-between items-center max-w-[1440px] mx-auto z-40 relative">
+<div class="flex items-center gap-4">
+<span class="font-headline-sm text-headline-sm font-black text-on-background md:hidden">QI SYSTEM</span>
+</div>
+<div class="flex items-center gap-6 ml-auto">
+<button class="text-on-background/70 font-medium hover:text-accent-neon transition-colors p-2 rounded-full border-4 border-transparent hover:border-on-background hover:bg-surface-container-lowest">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">notifications</span>
+</button>
+<button class="text-on-background/70 font-medium hover:text-accent-neon transition-colors p-2 rounded-full border-4 border-transparent hover:border-on-background hover:bg-surface-container-lowest">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">settings</span>
+</button>
+<div class="w-12 h-12 rounded-full border-4 border-on-background overflow-hidden bg-surface-container-lowest hard-shadow">
+<img alt="Administrator Profile" class="w-full h-full object-cover" data-alt="A striking portrait photo of an administrator profile avatar in a pop-art style with bold colors and high contrast." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVi5FMLCIcfAwfUNpZIp_46j8MAxirTuTo6g1LtxGSAwKu2z3RoCyhXpe0oJTbwvkaSTDRTRbZkiettV_g_g9fA5mbbf5u2TbDNi_hL1CaEnIQsi1MkhcUX7JwtW0_EdKaN9CAZ5h4HbSlNJa_dqUrQygu7JscNCVs9d1I5X84vKjjW7wFp-65dmhle7aiPqyKewuj5txUl7XkZcNjqm2MQJHptttrbeCgw66SP8rH7zccj3CHvJWkgWaJyon-0cxWqSKfMrHZT0c"/>
+</div>
+</div>
+</header>
+<!-- Dashboard Canvas -->
+<div class="flex-1 p-container-margin pt-8 max-w-[1440px] w-full mx-auto">
+<div class="mb-12 flex justify-between items-end">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-background uppercase">Overview</h2>
+<p class="font-body-lg text-body-lg text-on-background font-bold bg-surface-container-lowest inline-block px-4 py-1 border-4 border-on-background hard-shadow mt-4">System Status: Optimal</p>
+</div>
+<div class="hidden lg:block text-right">
+<p class="font-label-md text-label-md uppercase text-on-background">Live Sync</p>
+<p class="font-headline-sm text-headline-sm text-on-background animate-pulse">14:02:59 GMT</p>
+</div>
+</div>
+<!-- Stats Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-card-gap mb-card-gap">
+<div class="bg-surface-container-lowest rounded-xl p-inner-padding border-4 border-on-background hard-shadow hover:-translate-y-1 transition-transform">
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-md text-label-md uppercase text-on-surface">Active Drivers</span>
+<div class="w-10 h-10 rounded-full bg-accent-neon border-2 border-on-background flex items-center justify-center">
+<span class="material-symbols-outlined text-on-background">person</span>
+</div>
+</div>
+<div class="font-stats-display text-stats-display text-on-surface">24</div>
+<div class="mt-4 flex items-center gap-2">
+<span class="bg-accent-neon px-2 py-1 rounded-full font-label-md text-label-md uppercase text-on-background border-2 border-on-background flex items-center text-[10px]">
+<span class="material-symbols-outlined text-[14px]">arrow_upward</span> 12%
+                        </span>
+<span class="font-body-md text-body-md text-on-surface/70">vs last week</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest rounded-xl p-inner-padding border-4 border-on-background hard-shadow hover:-translate-y-1 transition-transform">
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-md text-label-md uppercase text-on-surface">Avail. Vehicles</span>
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed border-2 border-on-background flex items-center justify-center">
+<span class="material-symbols-outlined text-on-background">directions_car</span>
+</div>
+</div>
+<div class="font-stats-display text-stats-display text-on-surface">18</div>
+<div class="mt-4 flex items-center gap-2">
+<span class="bg-status-warning px-2 py-1 rounded-full font-label-md text-label-md uppercase text-on-background border-2 border-on-background flex items-center text-[10px]">
+<span class="material-symbols-outlined text-[14px]">arrow_downward</span> 3%
+                        </span>
+<span class="font-body-md text-body-md text-on-surface/70">under optimal</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest rounded-xl p-inner-padding border-4 border-on-background hard-shadow hover:-translate-y-1 transition-transform">
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-md text-label-md uppercase text-on-surface">Effective Permits</span>
+<div class="w-10 h-10 rounded-full bg-surface-deep border-2 border-on-background flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary">fact_check</span>
+</div>
+</div>
+<div class="font-stats-display text-stats-display text-on-surface">142</div>
+<div class="mt-4 flex items-center gap-2">
+<span class="font-label-md text-label-md text-status-warning uppercase">3 expiring soon</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest rounded-xl p-inner-padding border-4 border-on-background hard-shadow hover:-translate-y-1 transition-transform">
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-md text-label-md uppercase text-on-surface">Active Contracts</span>
+<div class="w-10 h-10 rounded-full bg-page-bg border-2 border-on-background flex items-center justify-center">
+<span class="material-symbols-outlined text-on-background">contract</span>
+</div>
+</div>
+<div class="font-stats-display text-stats-display text-on-surface">35</div>
+<div class="mt-4 flex items-center gap-2">
+<div class="w-full bg-surface-dim h-2 rounded-full overflow-hidden border border-on-background">
+<div class="bg-accent-neon w-[85%] h-full"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Main Content Grid -->
+<div class="grid grid-cols-12 gap-card-gap">
+<!-- Reminder Center (Side Column) -->
+<div class="col-span-12 xl:col-span-4 flex flex-col gap-card-gap">
+<div class="bg-surface-deep rounded-xl p-inner-padding border-4 border-on-background hard-shadow text-on-primary flex-1">
+<h3 class="font-headline-sm text-headline-sm uppercase mb-6 flex items-center justify-between">
+                            Reminder Center
+                            <span class="material-symbols-outlined text-[32px]">campaign</span>
+</h3>
+<div class="space-y-4">
+<!-- Alert 1 -->
+<div class="bg-on-background/20 rounded-lg p-4 border-2 border-on-background hover:bg-on-background/30 transition-colors cursor-pointer relative overflow-hidden">
+<div class="absolute top-0 left-0 w-2 h-full bg-status-error"></div>
+<div class="pl-2">
+<div class="flex justify-between items-start mb-2">
+<span class="bg-status-error text-on-error font-label-md text-label-md px-2 py-1 rounded-full border-2 border-on-background uppercase text-[10px]">Overdue</span>
+<span class="font-label-md text-label-md opacity-80 text-[10px]">2 hrs ago</span>
+</div>
+<p class="font-body-md text-body-md font-bold mb-1">Permit Renewal: TRK-992</p>
+<p class="font-body-md text-body-md text-sm opacity-80">Immediate action required for interstate transit.</p>
+</div>
+</div>
+<!-- Alert 2 -->
+<div class="bg-on-background/20 rounded-lg p-4 border-2 border-on-background hover:bg-on-background/30 transition-colors cursor-pointer relative overflow-hidden">
+<div class="absolute top-0 left-0 w-2 h-full bg-status-warning"></div>
+<div class="pl-2">
+<div class="flex justify-between items-start mb-2">
+<span class="bg-status-warning text-on-background font-label-md text-label-md px-2 py-1 rounded-full border-2 border-on-background uppercase text-[10px]">Expiring</span>
+<span class="font-label-md text-label-md opacity-80 text-[10px]">Today</span>
+</div>
+<p class="font-body-md text-body-md font-bold mb-1">Driver Cert: J. Doe</p>
+<p class="font-body-md text-body-md text-sm opacity-80">Hazmat certification expires in 48 hours.</p>
+</div>
+</div>
+<!-- Alert 3 -->
+<div class="bg-on-background/20 rounded-lg p-4 border-2 border-on-background hover:bg-on-background/30 transition-colors cursor-pointer relative overflow-hidden">
+<div class="absolute top-0 left-0 w-2 h-full bg-accent-neon"></div>
+<div class="pl-2">
+<div class="flex justify-between items-start mb-2">
+<span class="bg-accent-neon text-on-background font-label-md text-label-md px-2 py-1 rounded-full border-2 border-on-background uppercase text-[10px]">System</span>
+<span class="font-label-md text-label-md opacity-80 text-[10px]">Yesterday</span>
+</div>
+<p class="font-body-md text-body-md font-bold mb-1">Route Sync Complete</p>
+<p class="font-body-md text-body-md text-sm opacity-80">All navigational units updated to v2.1.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Placeholder for Dynamic Document Content -->
+<div class="bg-surface-container-lowest rounded-xl p-inner-padding border-4 border-on-background hard-shadow">
+<h4 class="font-label-md text-label-md uppercase mb-4 text-on-surface">Daily Briefing</h4>
+<div class="font-body-md text-body-md text-on-surface/80 p-4 bg-surface-dim border-2 border-on-background border-dashed rounded-lg">
+                            {{DATA:DOCUMENT:DOCUMENT_16}}
+                        </div>
+</div>
+</div>
+<!-- Recent Trip Summary (Main Column) -->
+<div class="col-span-12 xl:col-span-8">
+<div class="bg-surface-container-lowest rounded-xl border-4 border-on-background hard-shadow overflow-hidden flex flex-col h-full">
+<div class="p-inner-padding border-b-4 border-on-background flex justify-between items-center bg-surface-bright">
+<h3 class="font-headline-sm text-headline-sm uppercase text-on-surface">Recent Trip Summary</h3>
+<button class="font-label-md text-label-md uppercase px-4 py-2 border-2 border-on-background rounded-full hover:bg-surface-deep hover:text-on-primary transition-colors flex items-center gap-2">
+                                View All <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+<div class="overflow-x-auto p-4">
+<table class="w-full text-left border-collapse min-w-[700px]">
+<thead>
+<tr class="bg-surface-deep text-on-primary font-label-md text-label-md uppercase">
+<th class="p-4 rounded-tl-xl border-b-4 border-on-background">ID</th>
+<th class="p-4 border-b-4 border-on-background">Destination</th>
+<th class="p-4 border-b-4 border-on-background">Vehicle</th>
+<th class="p-4 border-b-4 border-on-background">Status</th>
+<th class="p-4 rounded-tr-xl border-b-4 border-on-background text-right">ETA</th>
+</tr>
+</thead>
+<tbody class="font-body-md text-body-md text-on-surface">
+<tr class="border-b-2 border-on-background/20 hover:bg-surface-container-low transition-colors">
+<td class="p-4 font-bold">#TRP-4402</td>
+<td class="p-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-page-bg" style="font-variation-settings: 'FILL' 1;">location_on</span>
+                                            Seattle, WA
+                                        </td>
+<td class="p-4 font-label-md text-label-md">FLT-01A</td>
+<td class="p-4">
+<span class="bg-accent-neon text-on-background font-label-md text-label-md px-3 py-1 rounded-full border-2 border-on-background uppercase inline-block">In Transit</span>
+</td>
+<td class="p-4 text-right font-bold">14:30 PST</td>
+</tr>
+<tr class="border-b-2 border-on-background/20 hover:bg-surface-container-low transition-colors bg-surface-dim/30">
+<td class="p-4 font-bold">#TRP-4401</td>
+<td class="p-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-page-bg" style="font-variation-settings: 'FILL' 1;">location_on</span>
+                                            Portland, OR
+                                        </td>
+<td class="p-4 font-label-md text-label-md">FLT-12B</td>
+<td class="p-4">
+<span class="bg-surface-deep text-on-primary font-label-md text-label-md px-3 py-1 rounded-full border-2 border-on-background uppercase inline-block">Loading</span>
+</td>
+<td class="p-4 text-right font-bold">16:00 PST</td>
+</tr>
+<tr class="border-b-2 border-on-background/20 hover:bg-surface-container-low transition-colors">
+<td class="p-4 font-bold">#TRP-4399</td>
+<td class="p-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-page-bg" style="font-variation-settings: 'FILL' 1;">location_on</span>
+                                            Boise, ID
+                                        </td>
+<td class="p-4 font-label-md text-label-md">FLT-08C</td>
+<td class="p-4">
+<span class="bg-status-warning text-on-background font-label-md text-label-md px-3 py-1 rounded-full border-2 border-on-background uppercase inline-block">Delayed</span>
+</td>
+<td class="p-4 text-right font-bold text-status-warning">Unknown</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors bg-surface-dim/30">
+<td class="p-4 font-bold">#TRP-4398</td>
+<td class="p-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-page-bg" style="font-variation-settings: 'FILL' 1;">location_on</span>
+                                            Vancouver, BC
+                                        </td>
+<td class="p-4 font-label-md text-label-md">FLT-22A</td>
+<td class="p-4">
+<span class="bg-surface-container-high text-on-surface font-label-md text-label-md px-3 py-1 rounded-full border-2 border-on-background uppercase inline-block">Delivered</span>
+</td>
+<td class="p-4 text-right font-bold opacity-50">--:--</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

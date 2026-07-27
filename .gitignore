@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+data/qi.db
+uploads/*
+!uploads/.gitkeep
+.DS_Store

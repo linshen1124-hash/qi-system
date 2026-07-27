@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Permit Management - QI SYSTEM</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&amp;family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#23005c",
+                        "tertiary-fixed": "#58ffa5",
+                        "surface-container-low": "#f1f3ff",
+                        "outline-variant": "#dbc2ad",
+                        "accent-neon": "#00FF99",
+                        "on-surface-variant": "#554434",
+                        "on-error": "#ffffff",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "surface-dim": "#d4daea",
+                        "surface-deep": "#7A32FF",
+                        "on-tertiary-fixed": "#00210f",
+                        "on-primary-fixed-variant": "#693c00",
+                        "on-secondary": "#ffffff",
+                        "outline": "#887361",
+                        "surface-bright": "#f9f9ff",
+                        "error": "#ba1a1a",
+                        "secondary-container": "#7b34ff",
+                        "surface-container": "#e8eefe",
+                        "surface-container-high": "#e3e8f9",
+                        "surface": "#f9f9ff",
+                        "secondary": "#6100e1",
+                        "tertiary-container": "#00cb79",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed": "#2c1600",
+                        "text-on-secondary": "#FFFFFF",
+                        "primary-container": "#ff9900",
+                        "on-tertiary-container": "#004f2c",
+                        "primary-fixed-dim": "#ffb86f",
+                        "on-error-container": "#93000a",
+                        "tertiary": "#006d3e",
+                        "on-secondary-container": "#eee4ff",
+                        "surface-tint": "#8a5100",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#dde2f3",
+                        "on-secondary-fixed-variant": "#5600ca",
+                        "on-background": "#161c27",
+                        "surface-container-lowest": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "primary": "#8a5100",
+                        "on-tertiary-fixed-variant": "#00522e",
+                        "page-bg": "#FF9900",
+                        "tertiary-fixed-dim": "#00e388",
+                        "inverse-surface": "#2a303d",
+                        "surface-variant": "#dde2f3",
+                        "secondary-fixed": "#e9ddff",
+                        "status-warning": "#E0A400",
+                        "on-surface": "#161c27",
+                        "inverse-primary": "#ffb86f",
+                        "primary-fixed": "#ffdcbd",
+                        "inverse-on-surface": "#ecf0ff",
+                        "on-primary-container": "#653a00",
+                        "status-error": "#E5484D",
+                        "text-on-primary": "#1E2430",
+                        "background": "#f9f9ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "card-gap": "24px",
+                        "inner-padding": "24px",
+                        "section-padding": "64px",
+                        "container-margin": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Anton"],
+                        "headline-lg": ["Anton"],
+                        "label-md": ["JetBrains Mono"],
+                        "headline-lg-mobile": ["Anton"],
+                        "body-md": ["Hanken Grotesk"],
+                        "stats-display": ["Anton"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "headline-md": ["Anton"]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["24px", { "lineHeight": "32px", "fontWeight": "400" }],
+                        "headline-lg": ["84px", { "lineHeight": "90px", "letterSpacing": "-0.02em", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["48px", { "lineHeight": "52px", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "22px", "fontWeight": "400" }],
+                        "stats-display": ["36px", { "lineHeight": "40px", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "500" }],
+                        "headline-md": ["48px", { "lineHeight": "56px", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .pop-card {
+            box-shadow: 4px 4px 0px 0px #161c27;
+            transition: all 0.2s ease;
+        }
+        .pop-card:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0px 0px #161c27;
+            border-color: #00FF99;
+        }
+    </style>
+</head>
+<body class="bg-page-bg min-h-screen text-on-background selection:bg-accent-neon selection:text-on-background font-body-md overflow-x-hidden">
+<!-- Top Navigation (Desktop) -->
+<header class="hidden md:flex w-full pt-4 px-8 bg-transparent text-on-background dark:text-on-background sticky top-0 z-50">
+<div class="flex justify-between items-center w-full max-w-[1440px] mx-auto flat no shadows bg-transparent">
+<!-- Brand -->
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 bg-surface-deep rounded-full flex items-center justify-center border-2 border-on-background shadow-[2px_2px_0px_0px_rgba(22,28,39,1)]">
+<span class="font-headline-sm text-headline-sm font-black text-on-secondary">QI</span>
+</div>
+<h1 class="font-headline-sm text-headline-sm font-black text-on-background">QI SYSTEM</h1>
+</div>
+<!-- Actions -->
+<div class="flex items-center gap-6">
+<!-- Search (on_left) -->
+<div class="relative group">
+<input class="pl-10 pr-4 py-2 border-2 border-on-background rounded-full bg-surface-lowest text-on-background placeholder:text-on-background/50 focus:outline-none focus:ring-0 focus:border-accent-neon transition-colors w-64" placeholder="Search Permits..." type="text"/>
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-background group-focus-within:text-accent-neon transition-colors">search</span>
+</div>
+<button class="w-10 h-10 rounded-full border-2 border-on-background bg-surface-lowest flex items-center justify-center hover:bg-accent-neon transition-colors hover:scale-95 duration-100 shadow-[2px_2px_0px_0px_rgba(22,28,39,1)] hover:shadow-none">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="w-10 h-10 rounded-full border-2 border-on-background bg-surface-lowest flex items-center justify-center hover:bg-accent-neon transition-colors hover:scale-95 duration-100 shadow-[2px_2px_0px_0px_rgba(22,28,39,1)] hover:shadow-none">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-10 h-10 rounded-full border-2 border-on-background overflow-hidden shadow-[2px_2px_0px_0px_rgba(22,28,39,1)] cursor-pointer">
+<img alt="Administrator Profile" class="w-full h-full object-cover" data-alt="Close-up portrait of a professional administrator in a brightly lit modern office, wearing dark-framed glasses and a crisp white shirt. The lighting is high-key and flattering, casting soft shadows. The background is slightly blurred, emphasizing a corporate B2B environment. The image has a clean, energetic aesthetic consistent with a modern logistics platform." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCs7QzC7jNNqhuKowdNStq0OnlLMIAP0op4Iik7P6FnRbmRSQlbjquCUOZLZ-_949r5JrMVkR_ljgLmG9GHA8YS6-oTTTe-Xd0gurnSl9_bFfpAIF30C8XsGO1LizyZaXualqaTiRVRSxX8AxDAUkYIumycrbJHwHEwpLbwcc322rzfkFJ1Oqd4tttPeHemoKchB0EVzdxLiGbYwhZvEcSimAG1jJ0zIU1PMJrpVRYRxAiQ25WDCcAt2uy0-BKYWOVdNyLfoo6_iKc"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Side Navigation & Main Layout -->
+<div class="flex h-[calc(100vh-80px)] mt-4 md:mt-0">
+<!-- Side Navigation (Web) -->
+<nav class="hidden md:flex h-screen w-72 fixed left-0 top-0 flex-col bg-secondary dark:bg-secondary text-text-on-secondary dark:text-text-on-secondary border-r-4 border-on-background shadow-[8px_0px_0px_0px_rgba(0,0,0,1)] z-40">
+<div class="flex flex-col h-full py-8">
+<!-- Header -->
+<div class="px-6 mb-8">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-8 h-8 bg-accent-neon rounded border-2 border-on-background flex items-center justify-center">
+<span class="font-headline-sm text-headline-sm text-on-background">Q</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-text-on-secondary tracking-tighter uppercase leading-none">QI LOGISTICS</h2>
+</div>
+<p class="font-label-md text-label-md text-text-on-secondary/70 uppercase">Global Ops v2.1</p>
+</div>
+<!-- CTA -->
+<div class="px-6 mb-8">
+<button class="w-full py-3 bg-surface-deep text-on-secondary font-headline-sm text-headline-sm rounded-full border-2 border-on-background shadow-[2px_2px_0px_0px_rgba(22,28,39,1)] hover:bg-accent-neon hover:text-on-background hover:translate-x-1 hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(22,28,39,1)] transition-all duration-200">
+                        New Dispatch
+                    </button>
+</div>
+<!-- Nav Links -->
+<div class="flex-1 overflow-y-auto">
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200 font-label-md text-label-md uppercase" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                        Dashboard
+                    </a>
+<a class="bg-accent-neon text-on-secondary-fixed rounded-none border-l-8 border-on-background px-6 py-4 flex items-center gap-4 font-label-md text-label-md uppercase" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+                        Inventory
+                    </a>
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200 font-label-md text-label-md uppercase" href="#">
+<span class="material-symbols-outlined">local_shipping</span>
+                        Shipments
+                    </a>
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200 font-label-md text-label-md uppercase" href="#">
+<span class="material-symbols-outlined">directions_bus</span>
+                        Fleet
+                    </a>
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200 font-label-md text-label-md uppercase" href="#">
+<span class="material-symbols-outlined">leaderboard</span>
+                        Analytics
+                    </a>
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200 font-label-md text-label-md uppercase" href="#">
+<span class="material-symbols-outlined">group</span>
+                        Team
+                    </a>
+</div>
+<!-- Footer Links -->
+<div class="mt-auto px-6 border-t-2 border-on-background/20 pt-4 space-y-2">
+<a class="text-text-on-secondary/80 py-2 flex items-center gap-4 hover:text-accent-neon transition-colors font-label-md text-label-md uppercase" href="#">
+<span class="material-symbols-outlined">help</span>
+                        Support
+                    </a>
+<a class="text-text-on-secondary/80 py-2 flex items-center gap-4 hover:text-accent-neon transition-colors font-label-md text-label-md uppercase" href="#">
+<span class="material-symbols-outlined">logout</span>
+                        Logout
+                    </a>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-72 p-container-margin w-full overflow-y-auto">
+<!-- Page Header -->
+<div class="mb-section-padding flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+<div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-background uppercase drop-shadow-[2px_2px_0px_rgba(255,255,255,1)]">Permit Control</h2>
+<p class="font-body-lg text-body-lg text-on-background bg-surface-lowest inline-block px-4 py-2 border-2 border-on-background rounded mt-2 font-bold uppercase shadow-[2px_2px_0px_0px_rgba(22,28,39,1)]">Manage Facility &amp; Fleet Access</p>
+</div>
+<!-- Quick Stats -->
+<div class="flex gap-4">
+<div class="bg-surface-deep text-on-secondary px-6 py-3 border-2 border-on-background rounded-xl pop-card flex items-center gap-4">
+<div class="bg-accent-neon text-on-background w-12 h-12 rounded-full flex items-center justify-center border-2 border-on-background">
+<span class="font-stats-display text-stats-display">14</span>
+</div>
+<div>
+<span class="block font-label-md text-label-md uppercase text-on-secondary/80">Pending</span>
+<span class="block font-headline-sm text-headline-sm">Approvals</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-card-gap">
+<!-- Large Status Card (Left Column) -->
+<div class="md:col-span-8 bg-surface-lowest border-4 border-on-background rounded-3xl p-inner-padding pop-card flex flex-col relative overflow-hidden">
+<!-- Decor -->
+<div class="absolute -right-20 -top-20 w-64 h-64 bg-accent-neon rounded-full mix-blend-multiply opacity-20 blur-3xl"></div>
+<div class="flex justify-between items-center mb-8 relative z-10 border-b-4 border-on-background pb-4">
+<h3 class="font-headline-sm text-headline-sm uppercase flex items-center gap-2">
+<span class="material-symbols-outlined text-surface-deep" style="font-variation-settings: 'FILL' 1;">assignment</span>
+                            Active Permits Overview
+                        </h3>
+<div class="flex gap-2">
+<button class="px-4 py-1 border-2 border-on-background rounded-full font-label-md text-label-md uppercase bg-surface-lowest hover:bg-surface-container transition-colors">Filter</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10 flex-1">
+<!-- Entry Permit Card -->
+<div class="bg-surface-lowest border-2 border-on-background rounded-2xl p-6 hover:bg-surface-bright transition-colors group cursor-pointer relative">
+<div class="absolute top-4 right-4 px-3 py-1 bg-accent-neon text-on-background font-label-md text-label-md rounded-full border-2 border-on-background uppercase font-bold flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(22,28,39,1)]">
+<span class="w-2 h-2 rounded-full bg-on-background animate-pulse"></span>
+                                Active
+                            </div>
+<div class="w-12 h-12 bg-surface-container-high rounded border-2 border-on-background flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">badge</span>
+</div>
+<h4 class="font-headline-sm text-headline-sm uppercase mb-1">Contractor Access</h4>
+<p class="font-label-md text-label-md text-on-background/60 uppercase mb-4">ID: PRM-882-X</p>
+<div class="space-y-2 font-label-md text-label-md border-t-2 border-on-background/10 pt-4">
+<div class="flex justify-between">
+<span class="text-on-background/70">Holder:</span>
+<span class="font-bold text-on-background">J. Smith Logistics</span>
+</div>
+<div class="flex justify-between">
+<span class="text-on-background/70">Zone:</span>
+<span class="font-bold text-on-background">Loading Bay C</span>
+</div>
+<div class="flex justify-between">
+<span class="text-on-background/70">Expires:</span>
+<span class="font-bold text-on-background">Oct 24, 2024</span>
+</div>
+</div>
+</div>
+<!-- Vehicle Permit Card (Expiring) -->
+<div class="bg-surface-lowest border-2 border-on-background rounded-2xl p-6 hover:bg-surface-bright transition-colors group cursor-pointer relative">
+<div class="absolute top-4 right-4 px-3 py-1 bg-status-warning text-on-background font-label-md text-label-md rounded-full border-2 border-on-background uppercase font-bold flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(22,28,39,1)]">
+<span class="material-symbols-outlined text-[14px]">warning</span>
+                               Expiring
+                           </div>
+<div class="w-12 h-12 bg-surface-container-high rounded border-2 border-on-background flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">local_shipping</span>
+</div>
+<h4 class="font-headline-sm text-headline-sm uppercase mb-1">Heavy Freight Env</h4>
+<p class="font-label-md text-label-md text-on-background/60 uppercase mb-4">ID: VEH-911-T</p>
+<div class="space-y-2 font-label-md text-label-md border-t-2 border-on-background/10 pt-4">
+<div class="flex justify-between">
+<span class="text-on-background/70">Vehicle:</span>
+<span class="font-bold text-on-background">Mack Anthem (AX-99)</span>
+</div>
+<div class="flex justify-between">
+<span class="text-on-background/70">Route:</span>
+<span class="font-bold text-on-background">Interstate Corr. A</span>
+</div>
+<div class="flex justify-between">
+<span class="text-on-background/70">Expires:</span>
+<span class="font-bold text-on-background text-status-warning">Tomorrow</span>
+</div>
+</div>
+</div>
+<!-- Entry Permit Card (Overdue) -->
+<div class="bg-surface-lowest border-2 border-on-background rounded-2xl p-6 hover:bg-surface-bright transition-colors group cursor-pointer relative md:col-span-2">
+<div class="absolute top-4 right-4 px-3 py-1 bg-status-error text-on-error font-label-md text-label-md rounded-full border-2 border-on-background uppercase font-bold flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(22,28,39,1)]">
+<span class="material-symbols-outlined text-[14px]">error</span>
+                               Overdue
+                           </div>
+<div class="flex items-start gap-6">
+<div class="w-16 h-16 bg-status-error/10 text-status-error rounded-xl border-2 border-status-error flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[32px]">dangerous</span>
+</div>
+<div class="flex-1">
+<h4 class="font-headline-sm text-headline-sm uppercase mb-1">Hazardous Mat Transport</h4>
+<p class="font-label-md text-label-md text-on-background/60 uppercase mb-2">ID: HAZ-004-F</p>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 font-label-md text-label-md">
+<div>
+<span class="block text-on-background/70 mb-1">Holder</span>
+<span class="font-bold">ChemLogix Inc.</span>
+</div>
+<div>
+<span class="block text-on-background/70 mb-1">Class</span>
+<span class="font-bold text-surface-deep">Class 3 (Flammable)</span>
+</div>
+<div class="md:col-span-2">
+<span class="block text-on-background/70 mb-1">Action Required</span>
+<button class="bg-status-error text-on-error px-4 py-1 border-2 border-on-background rounded uppercase font-bold hover:bg-on-background transition-colors text-xs w-full text-center">Revoke Access Now</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column (Issue New & Actions) -->
+<div class="md:col-span-4 flex flex-col gap-card-gap">
+<!-- Issue New Permit Action Card -->
+<button class="w-full bg-accent-neon border-4 border-on-background rounded-3xl p-8 pop-card flex flex-col items-center justify-center gap-4 group min-h-[300px] hover:bg-surface-deep hover:text-on-secondary transition-colors group">
+<div class="w-24 h-24 bg-surface-lowest text-on-background rounded-full border-4 border-on-background flex items-center justify-center shadow-[4px_4px_0px_0px_rgba(22,28,39,1)] group-hover:scale-110 transition-transform">
+<span class="font-headline-lg text-headline-lg leading-none mt-2">+</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm uppercase mt-4 text-center">Issue New<br/>Permit</h3>
+<p class="font-label-md text-label-md uppercase opacity-80 text-center max-w-[200px]">Create access passes for personnel or fleet vehicles</p>
+</button>
+<!-- Quick Stats Block -->
+<div class="bg-surface-deep text-on-secondary border-4 border-on-background rounded-3xl p-6 pop-card flex-1 flex flex-col justify-between relative overflow-hidden">
+<div class="absolute right-0 bottom-0 opacity-10 translate-x-1/4 translate-y-1/4">
+<span class="material-symbols-outlined text-[160px]" style="font-variation-settings: 'FILL' 1;">pie_chart</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm uppercase border-b-2 border-on-secondary/20 pb-2 mb-4 relative z-10">Usage Quota</h3>
+<div class="space-y-6 relative z-10">
+<div>
+<div class="flex justify-between font-label-md text-label-md uppercase mb-2">
+<span>Daily Guest Passes</span>
+<span class="font-bold text-accent-neon">45/50</span>
+</div>
+<div class="w-full h-4 bg-surface-lowest border-2 border-on-background rounded-full overflow-hidden">
+<div class="w-[90%] h-full bg-accent-neon border-r-2 border-on-background"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between font-label-md text-label-md uppercase mb-2">
+<span>Contractor Vehicles</span>
+<span class="font-bold text-tertiary-fixed">12/30</span>
+</div>
+<div class="w-full h-4 bg-surface-lowest border-2 border-on-background rounded-full overflow-hidden">
+<div class="w-[40%] h-full bg-tertiary-fixed border-r-2 border-on-background"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

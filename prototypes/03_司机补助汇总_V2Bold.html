@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Driver Subsidies Summary - QI SYSTEM</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Hanken+Grotesk:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#23005c",
+                        "tertiary-fixed": "#58ffa5",
+                        "surface-container-low": "#f1f3ff",
+                        "outline-variant": "#dbc2ad",
+                        "accent-neon": "#00FF99",
+                        "on-surface-variant": "#554434",
+                        "on-error": "#ffffff",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "surface-dim": "#d4daea",
+                        "surface-deep": "#7A32FF",
+                        "on-tertiary-fixed": "#00210f",
+                        "on-primary-fixed-variant": "#693c00",
+                        "on-secondary": "#ffffff",
+                        "outline": "#887361",
+                        "surface-bright": "#f9f9ff",
+                        "error": "#ba1a1a",
+                        "secondary-container": "#7b34ff",
+                        "surface-container": "#e8eefe",
+                        "surface-container-high": "#e3e8f9",
+                        "surface": "#f9f9ff",
+                        "secondary": "#6100e1",
+                        "tertiary-container": "#00cb79",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-fixed": "#2c1600",
+                        "text-on-secondary": "#FFFFFF",
+                        "primary-container": "#ff9900",
+                        "on-tertiary-container": "#004f2c",
+                        "primary-fixed-dim": "#ffb86f",
+                        "on-error-container": "#93000a",
+                        "tertiary": "#006d3e",
+                        "on-secondary-container": "#eee4ff",
+                        "surface-tint": "#8a5100",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#dde2f3",
+                        "on-secondary-fixed-variant": "#5600ca",
+                        "on-background": "#161c27",
+                        "surface-container-lowest": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "primary": "#8a5100",
+                        "on-tertiary-fixed-variant": "#00522e",
+                        "page-bg": "#FF9900",
+                        "tertiary-fixed-dim": "#00e388",
+                        "inverse-surface": "#2a303d",
+                        "surface-variant": "#dde2f3",
+                        "secondary-fixed": "#e9ddff",
+                        "status-warning": "#E0A400",
+                        "on-surface": "#161c27",
+                        "inverse-primary": "#ffb86f",
+                        "primary-fixed": "#ffdcbd",
+                        "inverse-on-surface": "#ecf0ff",
+                        "on-primary-container": "#653a00",
+                        "status-error": "#E5484D",
+                        "text-on-primary": "#1E2430",
+                        "background": "#f9f9ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "card-gap": "24px",
+                        "inner-padding": "24px",
+                        "section-padding": "64px",
+                        "container-margin": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-sm": ["Anton"],
+                        "headline-lg": ["Anton"],
+                        "label-md": ["JetBrains Mono"],
+                        "headline-lg-mobile": ["Anton"],
+                        "body-md": ["Hanken Grotesk"],
+                        "stats-display": ["Anton"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "headline-md": ["Anton"]
+                    },
+                    "fontSize": {
+                        "headline-sm": ["24px", { "lineHeight": "32px", "fontWeight": "400" }],
+                        "headline-lg": ["84px", { "lineHeight": "90px", "letterSpacing": "-0.02em", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["48px", { "lineHeight": "52px", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "22px", "fontWeight": "400" }],
+                        "stats-display": ["36px", { "lineHeight": "40px", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "500" }],
+                        "headline-md": ["48px", { "lineHeight": "56px", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #FF9900; /* page-bg / Vibrant Orange */
+            margin: 0;
+            overflow-x: hidden;
+        }
+        
+        /* Custom Scrollbar for a cleaner look */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #FF9900;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #161c27;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #23005c;
+        }
+
+        /* Material Symbols Fill override if needed globally */
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+<body class="font-body-md text-on-background flex min-h-screen relative">
+<!-- WebGL Background Overlay for subtle texture/animation -->
+
+<!-- SideNavBar (Desktop Only) -->
+<nav class="hidden md:flex bg-secondary h-screen w-72 fixed left-0 top-0 flex-col py-8 border-r-4 border-on-background shadow-[8px_0px_0px_0px_rgba(0,0,0,1)] z-50">
+<div class="px-6 mb-8 flex flex-col items-start">
+<div class="flex items-center gap-3 mb-2">
+<img alt="QI System Logo" class="w-10 h-10 rounded-full border-2 border-on-background object-cover" data-alt="A stylized, high-contrast, pop-art inspired icon representing logistics and delivery, featuring bold black outlines and a vibrant neon green and purple color palette on a white background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAMGCnjWvp6nGUt4b0pFe8nKCbm7Vr99nXqx1Hcrb7vTO6tJFcBb-RsZZahTNXin8kAqa_xxXwbmj97-gvP9KZ41ebWPghoeRyd3cuPDL8d3tpChATzcEIpnpVfgdrSubcMTlAYyk58aQ_P12PUnLMLF9kaJsrxTIM2VKfhYoHrTCqL98mwdxw-jl7DQ-54BOoPwgEEZ2Cv3Bwkx-27yliJNKVy63IPQwvB45iFvHkf3rBA4EwxmpPBtNp-dkllHF8uB490LHji7OE"/>
+<span class="font-headline-md text-headline-md text-text-on-secondary tracking-tighter uppercase">QI LOGISTICS</span>
+</div>
+<span class="font-label-md text-label-md text-text-on-secondary/70">Global Ops v2.1</span>
+</div>
+<button class="mx-6 mb-8 bg-surface-deep text-on-secondary font-headline-sm text-headline-sm py-3 px-6 rounded-full hover:scale-[1.02] transition-transform shadow-[4px_4px_0px_0px_rgba(22,28,39,1)] border-2 border-on-background uppercase">
+            New Dispatch
+        </button>
+<div class="flex-1 overflow-y-auto w-full">
+<ul class="flex flex-col w-full">
+<!-- Dashboard -->
+<li class="w-full">
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md uppercase">Dashboard</span>
+</a>
+</li>
+<!-- Inventory -->
+<li class="w-full">
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-label-md text-label-md uppercase">Inventory</span>
+</a>
+</li>
+<!-- Shipments -->
+<li class="w-full">
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">local_shipping</span>
+<span class="font-label-md text-label-md uppercase">Shipments</span>
+</a>
+</li>
+<!-- Fleet -->
+<li class="w-full">
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">directions_bus</span>
+<span class="font-label-md text-label-md uppercase">Fleet</span>
+</a>
+</li>
+<!-- Analytics -->
+<li class="w-full">
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">leaderboard</span>
+<span class="font-label-md text-label-md uppercase">Analytics</span>
+</a>
+</li>
+<!-- Team (Active Semantic Match for Drivers) -->
+<li class="w-full">
+<a class="bg-accent-neon text-on-secondary-fixed rounded-none border-l-8 border-on-background px-6 py-4 flex items-center gap-4 active-nav contrast-125" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-md text-label-md uppercase">Team</span>
+</a>
+</li>
+</ul>
+</div>
+<div class="mt-auto w-full pt-4 border-t-2 border-on-background/20">
+<ul class="flex flex-col w-full">
+<li class="w-full">
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-md text-label-md uppercase">Support</span>
+</a>
+</li>
+<li class="w-full">
+<a class="text-text-on-secondary/80 px-6 py-4 flex items-center gap-4 hover:bg-secondary-container hover:translate-x-2 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="font-label-md text-label-md uppercase">Logout</span>
+</a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 w-full md:pl-72 flex flex-col relative z-10">
+<!-- TopNavBar (Mobile Only based on platform rules, though user requested TopNavBar and SideNavBar. We'll render a variant for desktop that acts as a page header to respect the JSON while maintaining the chunky UI rules) -->
+<header class="w-full pt-4 px-8 bg-transparent flex justify-between items-center max-w-[1440px] mx-auto z-40 sticky top-0 md:static backdrop-blur-sm md:backdrop-blur-none">
+<div class="flex items-center gap-4">
+<!-- Mobile Menu Toggle -->
+<button class="md:hidden text-on-background p-2 border-2 border-on-background rounded bg-surface shadow-[2px_2px_0px_0px_rgba(22,28,39,1)]">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="font-headline-sm text-headline-sm font-black text-on-background uppercase md:hidden">QI SYSTEM</h1>
+</div>
+<!-- Contextual Header Actions -->
+<div class="flex items-center gap-6 bg-surface px-6 py-3 rounded-full border-2 border-on-background shadow-[4px_4px_0px_0px_rgba(22,28,39,1)]">
+<span class="font-headline-md text-headline-md md:text-[32px] md:leading-[36px] uppercase tracking-tighter">Subsidies</span>
+<div class="w-[2px] h-8 bg-on-background/20 mx-2"></div>
+<button aria-label="Notifications" class="hover:text-accent-neon transition-colors">
+<span class="material-symbols-outlined" data-weight="fill">notifications</span>
+</button>
+<button aria-label="Settings" class="hover:text-accent-neon transition-colors">
+<span class="material-symbols-outlined" data-weight="fill">settings</span>
+</button>
+<div class="ml-2 w-10 h-10 rounded-full border-2 border-on-background overflow-hidden">
+<img alt="Administrator Profile" class="w-full h-full object-cover" data-alt="A stylized portrait of a logistics administrator in a high-contrast, pop-art style with bold comic-book style outlines, featuring a confident expression against a vibrant neon yellow background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDkvstjV7-ZO8CuqJalQ0-CJ0x2TTzCH55MLBSr_4ILYi2P9XDn-URG-XvsByk7AxVpVAEEaxklv_o9A7gNycQHGKTekCyvgyDozkvVSghuvXq0F_0ijRZo4_LCxdWboUyF8xpy7B7Wyk_ZOcx0E1LrleGnBFHtgYjKFnjeiCck8iTUSSJNGeTas7bgX9zNTVfe1jE7_wMvNCY7Ybcb2qaLvcOfJqUA9X8QOvDT7I0CfgowpFWX6WrcoEymzpkA6AlesdVFv062YHc"/>
+</div>
+</div>
+</header>
+<div class="p-container-margin md:p-section-padding w-full max-w-[1440px] mx-auto flex flex-col gap-8">
+<!-- Page Header & Controls -->
+<div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 mb-4">
+<div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-background uppercase tracking-tighter mb-2">Driver Summary</h2>
+<p class="font-body-lg text-body-lg text-on-background/80 max-w-xl">Monthly overview of distance, overtime, and calculated subsidies based on active rates.</p>
+</div>
+<!-- Month Selection (Input Field style) -->
+<div class="flex flex-col gap-2 min-w-[250px]">
+<label class="font-label-md text-label-md text-on-background uppercase" for="month-select">Reporting Period</label>
+<div class="relative w-full">
+<select class="w-full appearance-none bg-surface-lowest border-2 border-on-background rounded font-headline-sm text-headline-sm px-4 py-3 shadow-[4px_4px_0px_0px_rgba(22,28,39,1)] focus:outline-none focus:ring-2 focus:ring-accent-neon focus:border-on-background cursor-pointer" id="month-select">
+<option value="2023-10">OCTOBER 2023</option>
+<option value="2023-09">SEPTEMBER 2023</option>
+<option value="2023-08">AUGUST 2023</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-on-background">
+<span class="material-symbols-outlined">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Massive Summary Cards (Bento Grid Style) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Total KM -->
+<div class="bg-surface-deep text-on-secondary rounded-[32px] p-inner-padding border-2 border-on-background shadow-[6px_6px_0px_0px_rgba(22,28,39,1)] hover:border-accent-neon transition-colors relative overflow-hidden flex flex-col justify-between h-[280px]">
+<div class="flex justify-between items-start relative z-10">
+<span class="font-label-md text-label-md uppercase bg-on-secondary text-surface-deep px-3 py-1 rounded-full">Distance</span>
+<span class="material-symbols-outlined text-4xl">route</span>
+</div>
+<div class="relative z-10">
+<div class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg tracking-tighter leading-none mb-2">42,890</div>
+<div class="font-headline-sm text-headline-sm text-on-secondary/80">TOTAL KM</div>
+</div>
+<!-- Decorative element -->
+<div class="absolute -right-10 -bottom-10 opacity-10">
+<span class="material-symbols-outlined text-[200px]" data-weight="fill">directions_car</span>
+</div>
+</div>
+<!-- Total OT -->
+<div class="bg-surface-deep text-on-secondary rounded-[32px] p-inner-padding border-2 border-on-background shadow-[6px_6px_0px_0px_rgba(22,28,39,1)] hover:border-accent-neon transition-colors relative overflow-hidden flex flex-col justify-between h-[280px]">
+<div class="flex justify-between items-start relative z-10">
+<span class="font-label-md text-label-md uppercase bg-on-secondary text-surface-deep px-3 py-1 rounded-full">Time</span>
+<span class="material-symbols-outlined text-4xl">schedule</span>
+</div>
+<div class="relative z-10">
+<div class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg tracking-tighter leading-none mb-2">345.5</div>
+<div class="font-headline-sm text-headline-sm text-on-secondary/80">TOTAL OT HOURS</div>
+</div>
+</div>
+<!-- Total Subsidy -->
+<div class="bg-surface-deep text-on-secondary rounded-[32px] p-inner-padding border-2 border-on-background shadow-[6px_6px_0px_0px_rgba(22,28,39,1)] hover:border-accent-neon transition-colors relative overflow-hidden flex flex-col justify-between h-[280px] md:col-span-1">
+<div class="flex justify-between items-start relative z-10">
+<span class="font-label-md text-label-md uppercase bg-accent-neon text-on-background px-3 py-1 rounded-full font-bold">Payout</span>
+<span class="material-symbols-outlined text-4xl text-accent-neon">payments</span>
+</div>
+<div class="relative z-10">
+<div class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-[64px] tracking-tighter leading-none mb-2 text-accent-neon">¥ 124,500</div>
+<div class="font-headline-sm text-headline-sm text-on-secondary/80">TOTAL SUBSIDY</div>
+</div>
+<!-- Logic implied subtle text -->
+<div class="absolute bottom-4 right-6 text-on-secondary/40 font-label-md text-label-md text-right max-w-[150px]">
+                        Σ (KM × Rate) +<br/> (OT × Rate)
+                    </div>
+</div>
+</div>
+<!-- Detailed List Section -->
+<div class="bg-surface-lowest rounded-[32px] border-2 border-on-background shadow-[8px_8px_0px_0px_rgba(22,28,39,1)] overflow-hidden mt-8">
+<div class="bg-surface-deep p-6 border-b-2 border-on-background flex justify-between items-center">
+<h3 class="font-headline-sm text-headline-sm text-on-secondary uppercase">Driver Breakdown</h3>
+<div class="font-label-md text-label-md text-on-secondary/80 bg-on-background/20 px-4 py-2 rounded-full hidden sm:block">
+                        Subsidy = (KM * Rate) + (OT * Rate)
+                    </div>
+</div>
+<div class="overflow-x-auto w-full">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-variant font-label-md text-label-md text-on-background uppercase border-b-2 border-on-background">
+<th class="p-4 pl-6 w-[250px]">Driver</th>
+<th class="p-4">Base Rate / KM</th>
+<th class="p-4">Total KM</th>
+<th class="p-4">OT Rate / Hr</th>
+<th class="p-4">Total OT</th>
+<th class="p-4 pr-6 text-right">Calculated Subsidy</th>
+</tr>
+</thead>
+<tbody class="font-body-md text-body-md text-on-background">
+<!-- Row 1 -->
+<tr class="border-b-2 border-on-background/20 hover:bg-surface-container-high transition-colors bg-surface-lowest">
+<td class="p-4 pl-6">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full border-2 border-on-background overflow-hidden shrink-0">
+<img alt="Driver Profile" class="w-full h-full object-cover" data-alt="A stylized portrait illustration of a male delivery driver wearing a cap, rendered in bold pop-art style with thick black outlines and vibrant flat colors." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUQP6PbWaU8ceZL5_vDAJq76h4Dk28aM3HYjz4DGCA8GY3X9_YobojN4T4meq_6V2WnMY4KAKt_BtgTe4LohMevbPwAvUjJe8viFc_v6_hyC03hVedrtQ1GA2Kj5H0y3Zd9kR8TuJd_WWHHsnL4sySPadesXsa2-rmWfb_FnQQWg0Z5zIfD5VLm88VDqtt5ccrm_jc3fBJVzmrLwqCKklESHI4OCdbW3COM2Nf13rxpqdB1-I6ccEImHGWL4Y7y_8Zzq3ISAzI00w"/>
+</div>
+<div>
+<div class="font-headline-sm text-[20px] leading-tight">J. Smith</div>
+<div class="font-label-md text-[10px] text-on-background/60 uppercase">ID: DRV-092</div>
+</div>
+</div>
+</td>
+<td class="p-4 font-label-md">¥ 12.5</td>
+<td class="p-4 font-headline-sm text-[20px]">3,420</td>
+<td class="p-4 font-label-md">¥ 45.0</td>
+<td class="p-4 font-headline-sm text-[20px]">24.5</td>
+<td class="p-4 pr-6 text-right">
+<span class="bg-accent-neon text-on-background font-headline-sm text-headline-sm px-4 py-1 rounded-full border-2 border-on-background inline-block">¥ 43,852</span>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="border-b-2 border-on-background/20 hover:bg-surface-container-high transition-colors bg-surface-container-low">
+<td class="p-4 pl-6">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full border-2 border-on-background bg-secondary flex items-center justify-center text-on-secondary font-headline-sm shrink-0">
+                                            MR
+                                        </div>
+<div>
+<div class="font-headline-sm text-[20px] leading-tight">M. Rodriguez</div>
+<div class="font-label-md text-[10px] text-on-background/60 uppercase">ID: DRV-114</div>
+</div>
+</div>
+</td>
+<td class="p-4 font-label-md">¥ 12.5</td>
+<td class="p-4 font-headline-sm text-[20px]">2,890</td>
+<td class="p-4 font-label-md">¥ 45.0</td>
+<td class="p-4 font-headline-sm text-[20px]">18.0</td>
+<td class="p-4 pr-6 text-right">
+<span class="bg-surface text-on-background font-headline-sm text-headline-sm px-4 py-1 rounded-full border-2 border-on-background inline-block">¥ 36,935</span>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="border-b-2 border-on-background/20 hover:bg-surface-container-high transition-colors bg-surface-lowest">
+<td class="p-4 pl-6">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full border-2 border-on-background overflow-hidden shrink-0">
+<img alt="Driver Profile" class="w-full h-full object-cover" data-alt="A stylized portrait illustration of a female delivery driver with short hair, rendered in bold pop-art style with thick black outlines and vibrant flat colors." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBw-DCsd_TT8JZzjl5xVQhqzVP3T8EPrmxMUnesW5-iMyrCYHUIv8JoLfuij8UmZFAWQIcdgFT1R0UGLVmZXkuU9FIXAzS-IriK-tfjtqojxE10B3IYAjY6WvKaGdy-4zMoMmO76bi1lVpxplVoY-Wl1y8RLy1P8d7TlcuqLJhfLS2VD06AEXLJU8FhP2rdhfRNNgrglGfflerfSdeTtj6EPyvGt4R8ed6TBbjoHXCWXV0xNHmNGsf60LgfRugeIwT6TE_RQkrkRN8"/>
+</div>
+<div>
+<div class="font-headline-sm text-[20px] leading-tight">A. Chen</div>
+<div class="font-label-md text-[10px] text-on-background/60 uppercase">ID: DRV-045</div>
+</div>
+</div>
+</td>
+<td class="p-4 font-label-md text-status-error font-bold">¥ 15.0 <span class="text-[10px] bg-status-error text-on-error px-1 rounded ml-1">PREM</span></td>
+<td class="p-4 font-headline-sm text-[20px]">4,150</td>
+<td class="p-4 font-label-md">¥ 50.0</td>
+<td class="p-4 font-headline-sm text-[20px]">32.0</td>
+<td class="p-4 pr-6 text-right">
+<span class="bg-surface text-on-background font-headline-sm text-headline-sm px-4 py-1 rounded-full border-2 border-on-background inline-block">¥ 63,850</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+</body></html>
