@@ -26,8 +26,6 @@ RULES = [
      "active=1", 30, None, None, None, "车辆年检到期：{title}", "年检合格标志", "车辆管理岗", "必办"),
     ("车辆", "车辆强制报废到期", "党政机关公务用车管理办法", "date_field", "vehicle", "retirement_date",
      "active=1", 60, None, None, None, "车辆强制报废到期：{title}", "报废处置手续", "车辆管理岗", "红线"),
-    ("人事", "因私出国回访", None, "date_field", "overseas", "end_date",
-     "status='已批准'", 7, None, None, None, "因私出国回访：{title}", "回访表、保密提醒表", "人事岗", "必办"),
 
     # ---- 周期类（periodic）----
     ("资产", "年度固定资产盘点", "中国电子技术标准化研究院固定资产管理办法", "periodic", None, None,

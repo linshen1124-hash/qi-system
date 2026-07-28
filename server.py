@@ -48,21 +48,15 @@ TABLES = {
                     "status", "apply_date", "notes"],
     "asset": ["asset_no", "name", "spec", "orig_value", "keeper", "location",
               "supplier", "buy_date", "status", "notes"],
-    "supplier": ["name", "category", "credit_no", "contact", "phone",
-                 "enroll_date", "status", "notes"],
-    "supplier_eval": ["year", "contract_name", "counterparty", "owner", "score", "result", "notes"],
     "staff": ["name", "branch", "dept", "title", "phone", "notes"],
     "welfare": ["item", "year", "staff_name", "branch", "signed", "notes"],
     "housing": ["campus", "room_no", "name", "dept", "area", "rent_month", "fee_year",
                 "relation", "move_in", "phone", "status", "notes"],
     "visitor": ["date", "name", "gender", "org", "reason", "host", "host_dept",
                 "id_no", "phone", "notes"],
-    "worker": ["name", "unit", "phone", "id_no", "monthly_pay", "bank", "status", "notes"],
-    "overseas": ["name", "dept", "country", "reason", "start_date", "end_date", "status", "notes"],
-    "title_eval": ["name", "dept", "series", "current_title", "apply_title", "year", "status", "notes"],
-    "party": ["date", "category", "title", "participants", "owner", "status", "notes"],
+    "dorm": ["region", "room_no", "bed_no", "gender", "name", "dept", "phone",
+             "move_in", "adjust_date", "fee_tier", "status", "code", "notes"],
     "publicity": ["date", "category", "title", "channel", "author", "status", "notes"],
-    "subscription": ["year", "name", "copies", "unit_price", "amount", "dept", "notes"],
     "archive_index": ["path", "filename", "domain", "year", "ftype", "size", "source", "notes"],
     "rule_source": ["name", "doc_no", "issuer", "level", "domain", "year", "url",
                     "source_file", "status", "notes"],
@@ -222,8 +216,7 @@ def _safe_date(y, m, d):
 _TITLE_FIELDS = {
     "vehicle": ["plate"], "permit": ["holder", "plate", "permit_no"],
     "contract": ["name"], "fee_bill": ["category", "period"], "asset": ["name", "asset_no"],
-    "housing": ["name", "campus"], "supplier": ["name"], "driver": ["name"],
-    "overseas": ["name"], "title_eval": ["name"],
+    "housing": ["name", "campus"], "driver": ["name"],
 }
 
 
@@ -320,7 +313,6 @@ def get_dashboard():
         "contract": db.one("SELECT COUNT(*) c FROM contract WHERE status!='已结束'")["c"],
         "procurement": db.one("SELECT COUNT(*) c FROM procurement WHERE status!='完成'")["c"],
         "asset": db.one("SELECT COUNT(*) c FROM asset WHERE status='在用'")["c"],
-        "supplier": db.one("SELECT COUNT(*) c FROM supplier WHERE status='合格'")["c"],
         "staff": db.one("SELECT COUNT(*) c FROM staff")["c"],
     }
     ob = obligation_view()
@@ -545,10 +537,6 @@ class Handler(BaseHTTPRequestHandler):
             cons, price = num(data.get("consumption")), num(data.get("unit_price"))
             if cons is not None and price is not None and not data.get("amount"):
                 data["amount"] = round(cons * price, 2)
-        elif table == "subscription":
-            cp, up = num(data.get("copies")), num(data.get("unit_price"))
-            if cp is not None and up is not None and not data.get("amount"):
-                data["amount"] = round(cp * up, 2)
 
     def _create(self, table, data):
         self._derive_fields(table, data)

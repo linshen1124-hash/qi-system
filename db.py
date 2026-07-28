@@ -231,30 +231,6 @@ CREATE TABLE IF NOT EXISTS asset (
     notes      TEXT
 );
 
--- ============ 模块七：供应商管理 ============
-CREATE TABLE IF NOT EXISTS supplier (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT NOT NULL,       -- 供应商名称
-    category    TEXT,                -- 保洁/绿化/餐饮/维修/办公用品/工程/其他
-    credit_no   TEXT,                -- 统一社会信用代码
-    contact     TEXT,                -- 联系人
-    phone       TEXT,                -- 电话
-    enroll_date TEXT,                -- 入库日期
-    status      TEXT DEFAULT '合格',  -- 合格/暂停/退出
-    notes       TEXT
-);
-
-CREATE TABLE IF NOT EXISTS supplier_eval (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    year          INTEGER,           -- 评价年度
-    contract_name TEXT,              -- 合同内容
-    counterparty  TEXT,              -- 合同乙方/供应商
-    owner         TEXT,              -- 承办人
-    score         REAL,              -- 评分
-    result        TEXT,              -- 优秀/合格/不合格
-    notes         TEXT
-);
-
 -- ============ 模块八：工会与职工 ============
 CREATE TABLE IF NOT EXISTS staff (
     id     INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -307,55 +283,25 @@ CREATE TABLE IF NOT EXISTS visitor (
     notes     TEXT
 );
 
--- ============ 模块十：人事管理（工勤人员 / 因私出国 / 职称评定）============
-CREATE TABLE IF NOT EXISTS worker (
+-- 单身宿舍床位安排（用房分配·宿舍用房子项）
+CREATE TABLE IF NOT EXISTS dorm (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT NOT NULL,      -- 姓名
-    unit        TEXT,               -- 单位全称
-    phone       TEXT,               -- 手机号
-    id_no       TEXT,               -- 证件号码
-    monthly_pay REAL,               -- 月补助/实发
-    bank        TEXT,               -- 开户行/卡号
-    status      TEXT DEFAULT '在岗', -- 在岗/离岗
+    region      TEXT,                -- 宿舍地区（望京经干院/西站中雅大厦...）
+    room_no     TEXT,                -- 宿舍房号
+    bed_no      TEXT,                -- 床位号
+    gender      TEXT,                -- 男宿舍/女宿舍
+    name        TEXT,                -- 住宿人（空=空床）
+    dept        TEXT,                -- 部门
+    phone       TEXT,                -- 联系电话
+    move_in     TEXT,                -- 入住时间
+    adjust_date TEXT,                -- 调整时间
+    fee_tier    TEXT,                -- 管理费挡位（400/800/1200/1500）
+    status      TEXT DEFAULT '在住',  -- 在住/已搬出/人才公寓/未入住
+    code        TEXT,                -- 备案编号（CESI-DSSS-...）
     notes       TEXT
 );
 
-CREATE TABLE IF NOT EXISTS overseas (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    name       TEXT NOT NULL,       -- 姓名
-    dept       TEXT,                -- 部门
-    country    TEXT,                -- 国家/地区
-    reason     TEXT,                -- 事由
-    start_date TEXT,                -- 出行起
-    end_date   TEXT,                -- 出行止
-    status     TEXT DEFAULT '待审批', -- 待审批/已批准/已回访
-    notes      TEXT
-);
-
-CREATE TABLE IF NOT EXISTS title_eval (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    name          TEXT NOT NULL,    -- 姓名
-    dept          TEXT,             -- 部门
-    series        TEXT,             -- 专业/系列（工程系列...）
-    current_title TEXT,             -- 现职称
-    apply_title   TEXT,             -- 申报职称
-    year          INTEGER,          -- 年度
-    status        TEXT DEFAULT '申报', -- 申报/评审中/通过/未通过
-    notes         TEXT
-);
-
--- ============ 模块十一：党群宣传 ============
-CREATE TABLE IF NOT EXISTS party (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    date         TEXT,              -- 日期
-    category     TEXT,              -- 理论学习/主题党日/组织生活/入党/思想汇报/志愿服务
-    title        TEXT NOT NULL,     -- 主题/事项
-    participants TEXT,              -- 参加人/人数
-    owner        TEXT,              -- 负责人
-    status       TEXT DEFAULT '计划', -- 计划/进行中/已完成
-    notes        TEXT
-);
-
+-- ============ 模块十一：宣传报道 ============
 CREATE TABLE IF NOT EXISTS publicity (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
     date     TEXT,                  -- 日期
@@ -365,18 +311,6 @@ CREATE TABLE IF NOT EXISTS publicity (
     author   TEXT,                  -- 撰稿人
     status   TEXT DEFAULT '拟稿',    -- 拟稿/已发布
     notes    TEXT
-);
-
--- ============ 模块十二：报刊征订 ============
-CREATE TABLE IF NOT EXISTS subscription (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    year       INTEGER,             -- 年度
-    name       TEXT NOT NULL,       -- 报刊名称
-    copies     INTEGER,             -- 份数
-    unit_price REAL,                -- 单价
-    amount     REAL,                -- 金额（可自动=份数×单价）
-    dept       TEXT,                -- 订阅部门
-    notes      TEXT
 );
 
 -- ============ 模块十三：档案索引（留存过去·可检索可溯源）============

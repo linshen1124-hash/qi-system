@@ -209,3 +209,26 @@ tfoot td{font-weight:700;border-top:var(--bd4);background:var(--surface)}
 /* 内容网格（工作台双栏） */
 .grid-2{display:grid;grid-template-columns:1fr;gap:22px}
 @media(min-width:1100px){.grid-2{grid-template-columns:1.6fr 1fr}}
+
+/* ---------- 用房分配：子标签 + 小统计卡 ---------- */
+.segbar{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.seg-btn{font-family:var(--font-body);font-weight:700;font-size:14px;cursor:pointer;
+  border:var(--bd);border-radius:12px;background:var(--paper);color:var(--ink);
+  padding:9px 18px;box-shadow:var(--hard-sm);transition:transform .12s,box-shadow .12s}
+.seg-btn:hover{transform:translate(-1px,-1px);box-shadow:var(--hard)}
+.seg-btn.active{background:var(--neon);color:var(--ink);box-shadow:var(--hard)}
+.mini-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-bottom:22px}
+.mini-card{background:var(--paper);border:var(--bd);border-radius:14px;padding:14px 16px;box-shadow:var(--hard-sm)}
+.mini-card .mk-k{font-size:12.5px;font-weight:600;color:var(--muted)}
+.mini-card .mk-v{font-family:var(--font-display);font-size:32px;line-height:1;margin-top:8px}
+.mini-card .mk-v small{font-family:var(--font-body);font-size:12px;color:var(--muted);font-weight:600}
+.tag.accent{background:var(--purple-deep);color:#fff}
+td.muted{color:var(--muted);font-size:12.5px}
+/* 长文本列：允许换行并限宽，避免把表撑出视口、挤掉操作列 */
+th.wrapcol,td.wrapcol{white-space:normal;word-break:break-word;min-width:140px;max-width:320px}
+/* 操作列（编辑/删除）不换行、贴右，并吸附在右侧——表再宽也够得着 */
+td.actions{white-space:nowrap;text-align:right;position:sticky;right:0;
+  background:var(--paper);border-left:2px solid rgba(22,28,39,.14)}
+tbody tr:nth-child(even) td.actions{background:#f2f4fa}
+tbody tr:hover td.actions{background:var(--surface-dim)}
+thead th:last-child{position:sticky;right:0;background:var(--purple-deep);border-left:2px solid var(--ink)}
