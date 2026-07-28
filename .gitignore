@@ -8,3 +8,10 @@ tmp_pdf_images/
 QI_SYSTEM.app/
 .claude/
 node_modules/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
