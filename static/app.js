@@ -120,6 +120,21 @@ const MODULES = {
       F('code', '备案编号'), F('notes', '备注', { full: 1 }),
     ],
   },
+  dorm_site: {
+    title: '宿舍点位', table: 'dorm_site', icon: '📍',
+    columns: [['region', '点位'], ['tenure', '性质'], ['capacity', '容量', 'num'], ['annual_rent', '年租金', 'money']],
+    fields: [
+      F('region', '点位名称', { req: 1 }),
+      F('tenure', '产权性质', { type: 'select', options: ['自有', '租用'], def: '租用', req: 1 }),
+      F('capacity', '床位容量', { type: 'number', def: 0 }),
+      F('address', '地址', { full: 1 }),
+      F('landlord', '出租方/中介（链家/赛西产业…）', { full: 1 }),
+      F('monthly_rent', '月租金(元)', { type: 'number' }),
+      F('annual_rent', '年租金(元)', { type: 'number' }),
+      F('lease_start', '租期起', { type: 'date' }), F('lease_end', '租期止', { type: 'date' }),
+      F('notes', '备注', { full: 1 }),
+    ],
+  },
   permit: {
     title: '出入证 / 车证', table: 'permit', icon: '🪪',
     columns: [['kind', '类型'], ['permit_no', '证件编号'], ['holder', '持证人'], ['plate', '车牌'], ['dept', '部门'], ['expire_date', '到期日', 'expire'], ['status', '状态', 'status']],
@@ -513,26 +528,43 @@ async function renderOfficeRooms(body) {
 }
 
 async function renderDormRooms(body) {
-  const rows = await api.get('/dorm');
+  const [rows, sitesRaw, feeReview] = await Promise.all([
+    api.get('/dorm'), api.get('/dorm_site'), api.get('/dorm/fee-review')]);
   const cntBy = (st) => rows.filter(r => r.status === st).length;
   const occupied = rows.filter(r => r.status !== '已搬出');  // 物理占用床位（在住 + 人才公寓）
-  const cap = DORM_CAP.reduce((a, [, c]) => a + c, 0);
+  // 按既定地理顺序排列点位（新加点位排末尾）
+  const sites = [...sitesRaw].sort((a, b) => (DORM_ORDER[a.region] ?? 99) - (DORM_ORDER[b.region] ?? 99));
+  const order = {}; sites.forEach((s, i) => order[s.region] = i);
+  const orderOf = (region) => (region in order ? order[region] : (DORM_ORDER[region] ?? 99));
+  const cap = sites.reduce((a, s) => a + (s.capacity || 0), 0);
+
+  // 产权性质汇总（自有 / 租用）
+  const own = sites.filter(s => s.tenure === '自有');
+  const rent = sites.filter(s => s.tenure === '租用');
+  const ownCap = own.reduce((a, s) => a + (s.capacity || 0), 0);
+  const rentCap = rent.reduce((a, s) => a + (s.capacity || 0), 0);
+  const rentAnnual = rent.reduce((a, s) => a + (s.annual_rent || 0), 0);
+  const tenureTag = (t) => `<span class="tag ${t === '自有' ? 'ok' : 'warn'}">${esc(t || '—')}</span>`;
 
   // 空床位汇总（按点位）：占用含在住与人才公寓，仅排除已搬出
-  const capRows = DORM_CAP.map(([name, c]) => {
-    const occ = occupied.filter(r => r.region === name).length;
-    const free = c - occ;
-    return `<tr><td>${esc(name)}</td><td class="num">${c}</td><td class="num">${occ}</td>
-      <td class="num">${free > 0 ? `<b style="color:var(--neon,#16a34a)">${free}</b>` : (free < 0 ? `<span class="tag danger">超${-free}</span>` : 0)}</td></tr>`;
+  const capRows = sites.map(s => {
+    const occ = occupied.filter(r => r.region === s.region).length;
+    const free = (s.capacity || 0) - occ;
+    return `<tr><td>${esc(s.region)}</td><td>${tenureTag(s.tenure)}</td>
+      <td class="num">${s.capacity || 0}</td><td class="num">${occ}</td>
+      <td class="num">${free > 0 ? `<b style="color:var(--neon,#16a34a)">${free}</b>` : (free < 0 ? `<span class="tag danger">超${-free}</span>` : 0)}</td>
+      <td class="num">${s.annual_rent ? money(s.annual_rent) : (s.tenure === '自有' ? '—' : '<span class="muted">待核实</span>')}</td>
+      <td class="actions"><button class="btn link" data-site="${s.id}">编辑</button></td></tr>`;
   }).join('');
 
   const cards = [
     ['床位总容量', cap, '床'], ['占用', occupied.length, '床'], ['空床位', cap - occupied.length, '床'],
-    ['其中·在住', cntBy('在住'), '人'], ['其中·人才公寓', cntBy('人才公寓'), '人'], ['已搬出', cntBy('已搬出'), '人'],
+    [`自有·${own.length}点`, ownCap, '床'], [`租用·${rent.length}点`, rentCap, '床'],
+    ['租用年租金', rentAnnual ? Math.round(rentAnnual / 1000) / 10 : 0, '万'],
   ].map(([k, v, u]) => `<div class="mini-card"><div class="mk-k">${k}</div><div class="mk-v">${v}<small> ${u}</small></div></div>`).join('');
 
   const sorted = [...rows].sort((a, b) =>
-    (DORM_ORDER[a.region] ?? 99) - (DORM_ORDER[b.region] ?? 99) ||
+    orderOf(a.region) - orderOf(b.region) ||
     String(a.room_no).localeCompare(String(b.room_no)) ||
     (parseInt(a.bed_no) || 0) - (parseInt(b.bed_no) || 0));
 
@@ -552,20 +584,59 @@ async function renderDormRooms(body) {
     body.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delRow('dorm', b.dataset.del));
   };
 
+  // 管理费调档（阶梯收费）：把每个在住人员按入住时间捋一遍
+  const soon = feeReview.filter(x => x.next && x.next.days_left <= 14).length;
+  const feeRow = (x) => {
+    const n = x.next;
+    const soonBg = n && n.days_left <= 14 ? ' style="background:rgba(224,164,0,.14)"' : '';
+    return `<tr${soonBg}>
+      <td><b>${esc(x.name)}</b></td><td class="muted wrapcol">${esc(x.dept)}</td>
+      <td>${esc(x.region)} ${esc(x.room_no)}</td><td>${esc(x.move_in)}</td>
+      <td class="num">${x.years_lived}年</td><td class="num">¥${x.cur_fee}</td>
+      <td>${n ? esc(n.date) : '<span class="muted">—</span>'}</td>
+      <td class="num">${n ? '¥' + n.new_fee : '<span class="tag ok">封顶</span>'}</td>
+      <td>${n ? (n.days_left <= 14 ? `<span class="tag warn">剩${n.days_left}天</span>` : `剩${n.days_left}天`) : ''}</td>
+      <td class="actions">${n ? `<button class="btn link" data-notice="${x.id}" data-years="${n.years}">通知单</button>` : ''}</td></tr>`;
+  };
+  const feeRowsHtml = feeReview.length ? feeReview.map(feeRow).join('')
+    : `<tr><td colspan="10"><div class="empty">暂无在住普通宿舍人员</div></td></tr>`;
+  const feePanel = `
+    <div class="panel"><div class="panel-h">
+      <h2><span class="ic">${icon('scale')}</span>管理费调档（阶梯收费）</h2>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="hint" style="margin:0">14天内待调档 <b>${soon}</b> 人</span>
+        <button class="btn sm" id="fee-scan">${icon('refresh')}扫描建提醒</button>
+      </div></div>
+      <div class="panel-b"><div style="overflow-x:auto"><table>
+      <thead><tr><th>姓名</th><th class="wrapcol">部门</th><th>点位·房号</th><th>入住时间</th><th class="num">已住</th><th class="num">当前档</th><th>下次调档日</th><th class="num">新档</th><th>剩余</th><th></th></tr></thead>
+      <tbody>${feeRowsHtml}</tbody></table></div></div>
+      <div class="hint" style="margin:14px 18px 4px;background:transparent;box-shadow:none;border:none;padding:0;font-weight:400;color:var(--muted)">
+        阶梯标准：前两年400 · 第三年800 · 第四年1200 · 第五年起1500元/月（《单身职工宿舍管理办法》第十九条）。调档周年前14天自动进待办；「通知单」按模板生成《宿舍房费调整通知单》。
+      </div></div>`;
+
   body.innerHTML = `
     <div class="mini-cards">${cards}</div>
-    <div class="panel"><div class="panel-h"><h2><span class="ic">${icon('room')}</span>各点位空床位</h2></div>
+    <div class="panel"><div class="panel-h"><h2><span class="ic">${icon('room')}</span>各点位空床位</h2>
+      <span class="hint" style="margin:0">自有 ${own.length}点/${ownCap}床 · 租用 ${rent.length}点/${rentCap}床</span></div>
       <div class="panel-b"><div style="overflow-x:auto"><table>
-      <thead><tr><th>宿舍地区</th><th class="num">床位容量</th><th class="num">占用</th><th class="num">空床位</th></tr></thead>
+      <thead><tr><th>宿舍地区</th><th>性质</th><th class="num">床位容量</th><th class="num">占用</th><th class="num">空床位</th><th class="num">年租金(元)</th><th></th></tr></thead>
       <tbody>${capRows}</tbody>
-      <tfoot><tr><td style="text-align:right"><b>合计</b></td><td class="num"><b>${cap}</b></td><td class="num"><b>${occupied.length}</b></td><td class="num"><b>${cap - occupied.length}</b></td></tr></tfoot>
+      <tfoot><tr><td colspan="2" style="text-align:right"><b>合计</b></td><td class="num"><b>${cap}</b></td><td class="num"><b>${occupied.length}</b></td><td class="num"><b>${cap - occupied.length}</b></td><td class="num"><b>${rentAnnual ? money(rentAnnual) : ''}</b></td><td></td></tr></tfoot>
       </table></div></div></div>
+    ${feePanel}
     <div class="toolbar"><input id="dm-q" placeholder="搜索姓名/房号/部门…" style="width:260px">
       <span class="hint" style="margin:0">共 ${rows.length} 条床位记录（按地区·房号·床位排序）</span><div class="spacer"></div></div>
     <div class="panel"><div class="panel-b"><div style="overflow-x:auto"><table>
       <thead><tr><th>地区</th><th>房号</th><th class="num">床位</th><th>男女</th><th>住宿人</th><th>部门</th><th>入住时间</th><th>状态</th><th>备案编号</th><th class="wrapcol">备注</th><th></th></tr></thead>
       <tbody id="dorm-tbody"></tbody></table></div></div></div>`;
   draw(sorted);
+  body.querySelectorAll('[data-site]').forEach(b => b.onclick = () => openForm('dorm_site', sites.find(s => s.id == b.dataset.site)));
+  body.querySelectorAll('[data-notice]').forEach(b => b.onclick = () => window.open(`/dorm/notice?id=${b.dataset.notice}&years=${b.dataset.years}`, '_blank'));
+  body.querySelector('#fee-scan').onclick = async () => {
+    const r = await api.post('/dorm/fee-scan', {});
+    toast(r.created ? `已新建 ${r.created} 条调档提醒（已进待办/看板）` : '暂无需新建的提醒');
+    viewRoomAlloc();
+  };
   const q = body.querySelector('#dm-q');
   q.oninput = () => { const s = q.value.trim().toLowerCase(); draw(s ? sorted.filter(r => Object.values(r).some(v => String(v ?? '').toLowerCase().includes(s))) : sorted); };
 }

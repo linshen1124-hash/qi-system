@@ -20,17 +20,22 @@ SRC = os.path.join(
 )
 OUT_XLSX = os.path.join(BASE, "单身宿舍名册（整理版）.xlsx")
 
-# 各点位床位容量（依据源表首行备注登记的床位数）
-REGION_CAP = [
-    ("望京经干院", 25),
-    ("西站中雅大厦", 12),
-    ("望京南湖中园", 5),
-    ("芳群园三区15号楼", 3),
-    ("芳古园一区14号楼", 3),
-    ("芳群园四区1号楼", 3),
-    ("定安东里6号楼", 3),
+# 各点位：容量 + 产权性质(自有/租用) + 租金。
+# 依据：源表首行备注登记的床位数；qi-bangong 单身职工宿舍租赁合同与《租赁房屋信息表》。
+# 望京经干院/西站中雅大厦/望京南湖中园=自有(经干院为院改造集体宿舍；中雅大厦/南湖中园经用户确认为自有)；
+# 4个平房点=链家/中介租赁(有合同+中介费+年租金)。
+SITES = [
+    # region, capacity, tenure, annual_rent, landlord
+    ("望京经干院",        25, "自有", None,     ""),
+    ("西站中雅大厦",      12, "自有", None,     ""),
+    ("望京南湖中园",       5, "自有", None,     ""),
+    ("芳群园三区15号楼",   3, "租用", 91021.2,  "中介租赁(链家)"),
+    ("芳古园一区14号楼",   3, "租用", 85170.0,  "中介租赁(链家)"),
+    ("芳群园四区1号楼",    3, "租用", 93798.0,  "中介租赁(链家)"),
+    ("定安东里6号楼",      3, "租用", None,     "中介租赁(链家)"),  # 年租金待核实
 ]
-REGION_ORDER = {name: i for i, (name, _) in enumerate(REGION_CAP)}
+REGION_CAP = [(name, cap) for name, cap, *_ in SITES]
+REGION_ORDER = {name: i for i, (name, *_ ) in enumerate(SITES)}
 
 
 def _xldate(v):
@@ -103,6 +108,16 @@ def import_db(recs):
     print(f"已写入 dorm 表：{len(recs)} 条")
 
 
+def import_sites():
+    db.init_db()
+    db.run("DELETE FROM dorm_site")
+    for region, cap, tenure, annual, landlord in SITES:
+        db.run("INSERT INTO dorm_site(region,tenure,capacity,annual_rent,landlord) "
+               "VALUES(?,?,?,?,?)", [region, tenure, cap, annual, landlord])
+    own = sum(1 for s in SITES if s[2] == "自有")
+    print(f"已写入 dorm_site 表：{len(SITES)} 个点位（自有{own} / 租用{len(SITES)-own}）")
+
+
 def make_xlsx(recs):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -162,6 +177,7 @@ def make_xlsx(recs):
 if __name__ == "__main__":
     data = parse()
     import_db(data)
+    import_sites()
     make_xlsx(data)
     # 概览
     from collections import Counter

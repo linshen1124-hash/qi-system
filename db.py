@@ -301,6 +301,21 @@ CREATE TABLE IF NOT EXISTS dorm (
     notes       TEXT
 );
 
+-- 宿舍点位（用房分配·各点位容量与产权性质：自有 / 租用）
+CREATE TABLE IF NOT EXISTS dorm_site (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    region       TEXT,                -- 点位名（与 dorm.region 对应）
+    tenure       TEXT DEFAULT '租用',  -- 自有 / 租用
+    capacity     INTEGER DEFAULT 0,   -- 床位容量
+    address      TEXT,                -- 地址
+    landlord     TEXT,                -- 出租方/中介（链家/赛西产业...）
+    monthly_rent REAL,                -- 月租金（元，含中介/税可另计）
+    annual_rent  REAL,                -- 年租金（元）
+    lease_start  TEXT,                -- 租期起
+    lease_end    TEXT,                -- 租期止
+    notes        TEXT
+);
+
 -- ============ 模块十一：宣传报道 ============
 CREATE TABLE IF NOT EXISTS publicity (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,

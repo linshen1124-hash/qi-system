@@ -4,3 +4,6 @@ data/qi.db
 uploads/*
 !uploads/.gitkeep
 .DS_Store
+tmp_pdf_images/
+QI_SYSTEM.app/
+.claude/

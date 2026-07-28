@@ -56,6 +56,8 @@ TABLES = {
                 "id_no", "phone", "notes"],
     "dorm": ["region", "room_no", "bed_no", "gender", "name", "dept", "phone",
              "move_in", "adjust_date", "fee_tier", "status", "code", "notes"],
+    "dorm_site": ["region", "tenure", "capacity", "address", "landlord",
+                  "monthly_rent", "annual_rent", "lease_start", "lease_end", "notes"],
     "publicity": ["date", "category", "title", "channel", "author", "status", "notes"],
     "archive_index": ["path", "filename", "domain", "year", "ftype", "size", "source", "notes"],
     "rule_source": ["name", "doc_no", "issuer", "level", "domain", "year", "url",
@@ -188,6 +190,92 @@ def auto_sync_todos():
                     "INSERT INTO todo(title, due_date, done, module, notes) VALUES(?,?,0,?,?)",
                     (t, row[date_field], ref, f"系统自动创建，来自{table}表"))
                 created += 1
+    created += sync_dorm_fee_todos()  # 宿舍管理费阶梯调档：提前14天建提醒
+    return created
+
+
+# ---------------- 宿舍管理费阶梯（《单身职工宿舍管理办法》第十九条）----------------
+# 普通宿舍：前两年 400/月，第三年 800，第四年 1200，第五年起 1500（实习生除外）。
+# 调档发生在入住满 2 / 3 / 4 年三个周年点。
+DORM_FEE_TIERS = [(0, 400), (2, 800), (3, 1200), (4, 1500)]  # (满N年阈值, 月管理费元)
+DORM_FEE_MAP = dict(DORM_FEE_TIERS)
+
+
+def _add_years(d, n):
+    try:
+        return d.replace(year=d.year + n)
+    except ValueError:  # 2/29 → 2/28
+        return d.replace(month=2, day=28, year=d.year + n)
+
+
+def _completed_years(m, today):
+    y = today.year - m.year
+    if (today.month, today.day) < (m.month, m.day):
+        y -= 1
+    return max(0, y)
+
+
+def dorm_fee_for_years(years):
+    fee = DORM_FEE_TIERS[0][1]
+    for thr, f in DORM_FEE_TIERS:
+        if years >= thr:
+            fee = f
+    return fee
+
+
+def dorm_next_adjust(move_in, today=None):
+    """下一次调档信息，或 None（已满4年封顶/无入住时间）。"""
+    today = today or date.today()
+    try:
+        m = date.fromisoformat(move_in)
+    except Exception:
+        return None
+    for thr, new_fee in DORM_FEE_TIERS[1:]:  # 满 2/3/4 年
+        adj = _add_years(m, thr)
+        if adj > today:
+            return {"date": adj.isoformat(), "years": thr,
+                    "old_fee": dorm_fee_for_years(thr - 1), "new_fee": new_fee,
+                    "days_left": (adj - today).days}
+    return None
+
+
+def dorm_fee_review(today=None):
+    """把每个在住普通宿舍人员按入住时间捋一遍：当前档位 + 下次调档。"""
+    today = today or date.today()
+    out = []
+    for r in db.rows("SELECT * FROM dorm WHERE status='在住' AND move_in IS NOT NULL "
+                     "AND move_in!='' ORDER BY move_in"):
+        try:
+            m = date.fromisoformat(r["move_in"])
+        except Exception:
+            continue
+        yrs = _completed_years(m, today)
+        out.append({"id": r["id"], "name": r["name"], "dept": r["dept"],
+                    "region": r["region"], "room_no": r["room_no"], "bed_no": r["bed_no"],
+                    "move_in": r["move_in"], "years_lived": yrs,
+                    "cur_fee": dorm_fee_for_years(yrs),
+                    "next": dorm_next_adjust(r["move_in"], today)})
+    out.sort(key=lambda x: (x["next"] is None, x["next"]["date"] if x["next"] else "9999"))
+    return out
+
+
+def sync_dorm_fee_todos(lead=14):
+    """对将在 lead 天内到达调档周年的在住人员，自动建一条待办（幂等）。"""
+    today = date.today()
+    created = 0
+    for r in db.rows("SELECT * FROM dorm WHERE status='在住' AND move_in IS NOT NULL AND move_in!=''"):
+        nxt = dorm_next_adjust(r["move_in"], today)
+        if not nxt or nxt["days_left"] > lead or nxt["days_left"] < 0:
+            continue
+        ref = f"dormfee:{r['id']}:{nxt['years']}"  # 每人每档唯一
+        if db.one("SELECT id FROM todo WHERE module=?", (ref,)):
+            continue
+        title = (f"宿舍管理费调档：{r['name']}（{r['region']} {r['room_no']}）"
+                 f"入住满{nxt['years']}年，{nxt['old_fee']}→{nxt['new_fee']}元/月")
+        notes = f"提前{lead}天提醒；请生成《宿舍房费调整通知单》交人事处。dorm#{r['id']}"
+        db.run("INSERT INTO todo(title, due_date, done, module, notes) VALUES(?,?,0,?,?)",
+               (title, nxt["date"], ref, notes))
+        created += 1
     return created
 
 
@@ -365,14 +453,79 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _send_html(self, html_str, code=200):
+        body = html_str.encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _dorm_notice(self, q):
+        """《宿舍房费调整通知单》可打印页（参照现有通知单模板）。"""
+        import html as _h
+        did = q.get("id", [""])[0]
+        row = db.one("SELECT * FROM dorm WHERE id=?", (did,)) if did.isdigit() else None
+        if not row:
+            return self._send_html("<h3>未找到该住宿人记录</h3>", 404)
+        # 目标档：优先取 years 参数，否则取下一次调档
+        years_q = q.get("years", [""])[0]
+        if years_q.isdigit() and int(years_q) in DORM_FEE_MAP:
+            years = int(years_q)
+        else:
+            nxt = dorm_next_adjust(row["move_in"])
+            years = nxt["years"] if nxt else 4
+        new_fee = DORM_FEE_MAP.get(years, 1500)
+        try:
+            adj = _add_years(date.fromisoformat(row["move_in"]), years)
+            eff_y, eff_m = adj.year, adj.month
+        except Exception:
+            eff_y = eff_m = ""
+        today = date.today()
+        name = _h.escape(row.get("name") or "")
+        dept = _h.escape(row.get("dept") or "")
+        html_str = f"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<title>宿舍房费调整通知单-{name}</title>
+<style>
+  @page {{ size: A4; margin: 2.2cm; }}
+  body {{ font-family:"Noto Sans SC","Microsoft YaHei","SimSun",serif; color:#111; }}
+  .sheet {{ max-width:640px; margin:32px auto; padding:28px 34px; }}
+  h1 {{ text-align:center; font-size:24px; letter-spacing:6px; margin:6px 0 4px; }}
+  .date {{ text-align:right; font-size:15px; margin-bottom:22px; }}
+  table {{ width:100%; border-collapse:collapse; font-size:16px; }}
+  td {{ border:1px solid #333; padding:12px 14px; }}
+  td.lbl {{ width:110px; background:#f5f5f5; text-align:center; white-space:nowrap; }}
+  .body-cell {{ height:70px; vertical-align:middle; line-height:1.9; }}
+  .sign {{ margin-top:34px; font-size:15px; display:flex; gap:60px; }}
+  .toolbar {{ text-align:center; margin:18px 0; }}
+  .toolbar button {{ font-size:14px; padding:8px 20px; cursor:pointer; }}
+  @media print {{ .toolbar {{ display:none; }} .sheet {{ margin:0; }} }}
+</style></head><body>
+<div class="toolbar"><button onclick="window.print()">打印 / 另存为 PDF</button></div>
+<div class="sheet">
+  <h1>宿舍房费调整通知单</h1>
+  <div class="date">{today.year} 年 {today.month} 月 {today.day} 日</div>
+  <table>
+    <tr><td class="lbl">姓　名</td><td>{name}</td></tr>
+    <tr><td class="lbl">工作部门</td><td>{dept}</td></tr>
+    <tr><td colspan="2" class="body-cell">　　自 {eff_y} 年 {eff_m} 月起，房费调整为 <b>{new_fee}</b> 元／月。</td></tr>
+  </table>
+  <div class="sign"><div>部门负责人：___________</div><div>经办人：___________</div></div>
+</div></body></html>"""
+        return self._send_html(html_str)
+
     # ---- 路由 ----
     def do_GET(self):
         u = urlparse(self.path)
         p = u.path
         q = parse_qs(u.query)
         try:
+            if p == "/dorm/notice":
+                return self._dorm_notice(q)
             if not p.startswith("/api/"):
                 return self._static(p)
+            if p == "/api/dorm/fee-review":
+                return self._json(dorm_fee_review())
             if p == "/api/dashboard":
                 return self._json(get_dashboard())
             if p == "/api/reminders":
@@ -434,6 +587,11 @@ class Handler(BaseHTTPRequestHandler):
                 run_rule_engine()
                 self._audit("run_engine", "obligation", None, "手动触发规则引擎")
                 return self._json(obligation_view())
+            if p == "/api/dorm/fee-scan":
+                lead = int(data.get("lead", 14))
+                n = sync_dorm_fee_todos(lead)
+                self._audit("dorm_fee_scan", "dorm", None, f"扫描宿舍管理费调档，新建提醒{n}条")
+                return self._json({"created": n})
             m = re.match(r"^/api/obligation/(\d+)/close$", p)
             if m:
                 oid = int(m.group(1))
