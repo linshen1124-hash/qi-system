@@ -434,7 +434,7 @@ CREATE INDEX IF NOT EXISTS idx_energy_reading_period ON energy_reading(period, e
 -- 19a. 获取提醒列表
 CREATE OR REPLACE FUNCTION get_reminders(p_days integer DEFAULT 30)
 RETURNS TABLE(
-    kind text, title text, date date, days_left integer,
+    kind text, title text, remind_date date, days_left integer,
     overdue boolean, entity text, eid bigint
 )
 LANGUAGE sql STABLE
@@ -473,7 +473,7 @@ AS $$
         (due_date < CURRENT_DATE), 'todo'::text, id::bigint
     FROM todo WHERE done = false AND due_date IS NOT NULL
         AND due_date <= CURRENT_DATE + p_days
-    ORDER BY date;
+    ORDER BY remind_date;
 $$;
 
 -- 19b. 仪表盘
@@ -511,10 +511,10 @@ BEGIN
     -- 提醒
     SELECT COALESCE(jsonb_agg(
         jsonb_build_object(
-            'kind', r.kind, 'title', r.title, 'date', r.date,
+            'kind', r.kind, 'title', r.title, 'date', r.remind_date,
             'days_left', r.days_left, 'overdue', r.overdue,
             'entity', r.entity, 'id', r.eid
-        ) ORDER BY r.date
+        ) ORDER BY r.remind_date
     ), '[]'::jsonb) INTO v_reminders
     FROM get_reminders(v_days) r;
 
