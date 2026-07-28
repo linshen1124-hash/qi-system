@@ -473,7 +473,7 @@ AS $$
         (due_date < CURRENT_DATE), 'todo'::text, id::bigint
     FROM todo WHERE done = false AND due_date IS NOT NULL
         AND due_date <= CURRENT_DATE + p_days
-    ORDER BY remind_date;
+    ORDER BY 3;
 $$;
 
 -- 19b. 仪表盘
