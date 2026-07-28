@@ -66,6 +66,10 @@ TABLES = {
     "archive_index": ["path", "filename", "domain", "year", "ftype", "size", "source", "notes"],
     "rule_source": ["name", "doc_no", "issuer", "level", "domain", "year", "url",
                     "source_file", "status", "notes"],
+    "rule": ["domain", "name", "source_id", "trigger_type", "target_table", "date_field",
+             "condition", "lead_days", "period", "due_month", "due_day", "obligation_tmpl",
+             "evidence_required", "responsible", "severity", "active", "notes"],
+    "obligation": ["state", "actor", "evidence_attachment_id"],
 }
 
 
@@ -202,6 +206,109 @@ def _remind_item(kind, title, d, today, entity, eid):
             "overdue": (left is not None and left < 0), "entity": entity, "id": eid}
 
 
+# ---------------- P2 规则引擎 ----------------
+import calendar
+
+
+def _safe_date(y, m, d):
+    """把 (年,月,日) 收敛为合法日期（日超过当月天数则取月末）。"""
+    m = max(1, min(12, int(m or 12)))
+    last = calendar.monthrange(y, m)[1]
+    d = max(1, min(last, int(d or last)))
+    return date(y, m, d)
+
+
+# 各表用于义务标题的"人话"字段，按优先级取第一个非空
+_TITLE_FIELDS = {
+    "vehicle": ["plate"], "permit": ["holder", "plate", "permit_no"],
+    "contract": ["name"], "fee_bill": ["category", "period"], "asset": ["name", "asset_no"],
+    "housing": ["name", "campus"], "supplier": ["name"], "driver": ["name"],
+    "overseas": ["name"], "title_eval": ["name"],
+}
+
+
+def _row_title(table, row):
+    for f in _TITLE_FIELDS.get(table, ["name"]):
+        v = row.get(f)
+        if v:
+            return str(v)
+    return f"#{row.get('id', '')}"
+
+
+def _upsert_obligation(ref, r, title, entity, entity_id, due):
+    ex = db.one("SELECT id, state FROM obligation WHERE ref=?", (ref,))
+    if ex:
+        if ex["state"] in ("done", "waived"):
+            return  # 已闭环的不再刷新
+        db.run("UPDATE obligation SET title=?, due_date=?, severity=?, evidence_required=?, domain=? "
+               "WHERE id=?",
+               (title, due, r["severity"], r["evidence_required"], r["domain"], ex["id"]))
+    else:
+        db.run("INSERT INTO obligation(ref,rule_id,domain,title,entity,entity_id,due_date,"
+               "state,severity,evidence_required) VALUES(?,?,?,?,?,?,?, 'pending', ?, ?)",
+               (ref, r["id"], r["domain"], title, entity, entity_id, due,
+                r["severity"], r["evidence_required"]))
+
+
+def _gen_date_field(r, today):
+    tbl, fld = r["target_table"], r["date_field"]
+    if tbl not in TABLES or not fld:
+        return
+    horizon = (today + timedelta(days=int(r["lead_days"] or 30))).isoformat()
+    cond = f" AND ({r['condition']})" if r.get("condition") else ""
+    sql = f"SELECT * FROM {tbl} WHERE {fld} IS NOT NULL AND {fld}<>'' AND {fld} <= ?{cond}"
+    for row in db.rows(sql, (horizon,)):
+        ref = f"rule:{r['id']}:{tbl}:{row['id']}"
+        tmpl = r["obligation_tmpl"] or (r["name"] + "：{title}")
+        title = tmpl.replace("{title}", _row_title(tbl, row))
+        _upsert_obligation(ref, r, title, tbl, row["id"], row[fld])
+
+
+def _gen_periodic(r, today):
+    period = r["period"] or "annual"
+    if period == "monthly":
+        due = _safe_date(today.year, today.month, r["due_day"])
+        pkey = f"{today.year}-{today.month:02d}"
+    elif period == "quarterly":
+        q = (today.month - 1) // 3 + 1
+        due = _safe_date(today.year, q * 3, r["due_day"])
+        pkey = f"{today.year}-Q{q}"
+    else:  # annual
+        due = _safe_date(today.year, r["due_month"], r["due_day"])
+        pkey = f"{today.year}"
+    ref = f"rule:{r['id']}:period:{pkey}"
+    title = (r["obligation_tmpl"] or r["name"]).replace("{title}", pkey)
+    _upsert_obligation(ref, r, title, None, None, due.isoformat())
+
+
+def run_rule_engine():
+    """扫描全部启用规则 × 数据，生成/刷新义务，并把逾期未闭环的置为 overdue。"""
+    today = date.today()
+    for r in db.rows("SELECT * FROM rule WHERE active=1"):
+        try:
+            if r["trigger_type"] == "date_field":
+                _gen_date_field(r, today)
+            elif r["trigger_type"] == "periodic":
+                _gen_periodic(r, today)
+        except Exception:
+            continue
+    db.run("UPDATE obligation SET state='overdue' WHERE state='pending' "
+           "AND due_date IS NOT NULL AND due_date<>'' AND due_date < ?", (today.isoformat(),))
+
+
+def obligation_view():
+    run_rule_engine()
+    items = db.rows(
+        "SELECT o.*, r.name rule_name, s.name source_name, s.doc_no, s.url source_url "
+        "FROM obligation o LEFT JOIN rule r ON o.rule_id=r.id "
+        "LEFT JOIN rule_source s ON r.source_id=s.id "
+        "ORDER BY CASE o.state WHEN 'overdue' THEN 0 WHEN 'pending' THEN 1 "
+        "WHEN 'done' THEN 2 ELSE 3 END, o.due_date")
+    open_n = sum(1 for o in items if o["state"] in ("pending", "overdue"))
+    overdue_n = sum(1 for o in items if o["state"] == "overdue")
+    return {"items": items, "open": open_n, "overdue": overdue_n, "total": len(items)}
+
+
 def get_dashboard():
     auto_sync_todos()
     counts = {
@@ -216,6 +323,9 @@ def get_dashboard():
         "supplier": db.one("SELECT COUNT(*) c FROM supplier WHERE status='合格'")["c"],
         "staff": db.one("SELECT COUNT(*) c FROM staff")["c"],
     }
+    ob = obligation_view()
+    counts["obligation_open"] = ob["open"]
+    counts["obligation_overdue"] = ob["overdue"]
     reminders = get_reminders()
     return {"counts": counts, "reminders": reminders,
             "overdue": sum(1 for r in reminders if r["overdue"])}
@@ -284,6 +394,12 @@ class Handler(BaseHTTPRequestHandler):
             if p == "/api/energy/summary":
                 per = q.get("period", [date.today().strftime("%Y-%m")])[0]
                 return self._json(energy_summary(per))
+            if p == "/api/obligations":
+                return self._json(obligation_view())
+            if p == "/api/audit_log":
+                lim = int(q.get("limit", ["200"])[0])
+                return self._json(db.rows(
+                    "SELECT * FROM audit_log ORDER BY id DESC LIMIT ?", (lim,)))
             if p == "/api/attachment":
                 ent = q.get("entity", [""])[0]
                 eid = q.get("id", [0])[0]
@@ -322,6 +438,19 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True})
             if p == "/api/attachment":
                 return self._json(self._upload(data))
+            if p == "/api/obligations/run":
+                run_rule_engine()
+                self._audit("run_engine", "obligation", None, "手动触发规则引擎")
+                return self._json(obligation_view())
+            m = re.match(r"^/api/obligation/(\d+)/close$", p)
+            if m:
+                oid = int(m.group(1))
+                actor = self._actor()
+                db.run("UPDATE obligation SET state='done', actor=?, "
+                       "closed_at=datetime('now','localtime'), evidence_attachment_id=? WHERE id=?",
+                       (actor, data.get("evidence_attachment_id"), oid))
+                self._audit("close", "obligation", oid, f"义务闭环 by {actor}")
+                return self._json({"ok": True})
             m = re.match(r"^/api/([a-z_]+)$", p)
             if m and m.group(1) in TABLES:
                 return self._json(self._create(m.group(1), data))
@@ -346,6 +475,7 @@ class Handler(BaseHTTPRequestHandler):
             m = re.match(r"^/api/([a-z_]+)/(\d+)$", u.path)
             if m and m.group(1) in TABLES:
                 db.run(f"DELETE FROM {m.group(1)} WHERE id=?", (int(m.group(2)),))
+                self._audit("delete", m.group(1), int(m.group(2)), "删除记录")
                 return self._json({"ok": True})
             m = re.match(r"^/api/attachment/(\d+)$", u.path)
             if m:
@@ -359,6 +489,18 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404)
         except Exception as e:
             self._json({"error": str(e)}, 500)
+
+    # ---- 审计 ----
+    def _actor(self):
+        """操作者标识：优先 X-Actor 头（供 AI/多端标注），否则记 user。"""
+        return self.headers.get("X-Actor", "user")
+
+    def _audit(self, action, entity, entity_id, summary):
+        try:
+            db.run("INSERT INTO audit_log(actor,action,entity,entity_id,summary) VALUES(?,?,?,?,?)",
+                   (self._actor(), action, entity, entity_id, summary))
+        except Exception:
+            pass
 
     # ---- 通用 CRUD ----
     def _list(self, table, q):
@@ -414,6 +556,7 @@ class Handler(BaseHTTPRequestHandler):
         vals = [data[c] for c in cols]
         ph = ",".join("?" * len(cols))
         nid = db.run(f"INSERT INTO {table}({','.join(cols)}) VALUES({ph})", vals)
+        self._audit("create", table, nid, "新增记录")
         return {"id": nid}
 
     def _update(self, table, rid, data):
@@ -423,6 +566,7 @@ class Handler(BaseHTTPRequestHandler):
             return {"id": rid}
         sets = ",".join(f"{c}=?" for c in cols)
         db.run(f"UPDATE {table} SET {sets} WHERE id=?", [data[c] for c in cols] + [rid])
+        self._audit("update", table, rid, "修改字段：" + ",".join(cols))
         return {"id": rid}
 
     # ---- 附件（base64 上传） ----

@@ -408,6 +408,59 @@ CREATE TABLE IF NOT EXISTS rule_source (
     notes       TEXT
 );
 
+-- ============ 模块十五：P2 规则引擎（规则/义务/审计）============
+-- 规则即数据：每条规则挂靠一份依据(source_id)，引擎据此推导义务
+CREATE TABLE IF NOT EXISTS rule (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    domain         TEXT,              -- 业务域
+    name           TEXT NOT NULL,     -- 规则名
+    source_id      INTEGER REFERENCES rule_source(id),  -- 依据
+    trigger_type   TEXT,              -- date_field(日期字段临期) / periodic(周期)
+    target_table   TEXT,              -- 作用对象表（date_field 用）
+    date_field     TEXT,              -- 触发日期字段
+    condition      TEXT,              -- 附加SQL条件片段（管理员维护）
+    lead_days      INTEGER DEFAULT 30,-- 提前量
+    period         TEXT,              -- annual/quarterly/monthly（periodic 用）
+    due_month      INTEGER,           -- 年度截止月
+    due_day        INTEGER,           -- 截止日
+    obligation_tmpl TEXT,             -- 义务标题模板（可含 {title}）
+    evidence_required TEXT,           -- 需要的证据
+    responsible    TEXT,              -- 责任角色/岗位
+    severity       TEXT DEFAULT '必办',-- 提醒/必办/红线
+    active         INTEGER DEFAULT 1,
+    notes          TEXT
+);
+
+-- 义务：引擎据规则×数据自动生成的"应办之事"
+CREATE TABLE IF NOT EXISTS obligation (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ref         TEXT UNIQUE,          -- 幂等标识 rule:<id>:<...>
+    rule_id     INTEGER REFERENCES rule(id),
+    domain      TEXT,
+    title       TEXT,
+    entity      TEXT,                 -- 关联记录表
+    entity_id   INTEGER,              -- 关联记录id
+    due_date    TEXT,
+    state       TEXT DEFAULT 'pending', -- pending/done/overdue/waived
+    severity    TEXT,
+    evidence_required TEXT,
+    evidence_attachment_id INTEGER,
+    actor       TEXT,                 -- 完成人
+    closed_at   TEXT,
+    created     TEXT DEFAULT (datetime('now','localtime'))
+);
+
+-- 审计日志：所有写操作留痕（AI 与人皆可追溯）
+CREATE TABLE IF NOT EXISTS audit_log (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts        TEXT DEFAULT (datetime('now','localtime')),
+    actor     TEXT,                   -- system/ai/user 或具体标识
+    action    TEXT,                   -- create/update/delete/close/run_engine
+    entity    TEXT,
+    entity_id INTEGER,
+    summary   TEXT
+);
+
 -- ============ 待办 / 附件 ============
 CREATE TABLE IF NOT EXISTS todo (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,

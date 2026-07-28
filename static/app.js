@@ -406,6 +406,27 @@ const MODULES = {
     ],
     hint: '规则层的权威依据：内部院级制度 + 外部主管部门法规。每条规则(rule)将挂靠此处一份依据。用搜索框按业务域/发文机关定位。',
   },
+  rule: {
+    title: '规则库', table: 'rule', icon: '📐',
+    columns: [['name', '规则名'], ['domain', '业务域'], ['trigger_type', '触发'], ['severity', '级别', 'status'], ['responsible', '责任岗'], ['active', '启用', 'bool']],
+    fields: [
+      F('name', '规则名', { req: 1, full: 1 }),
+      F('domain', '业务域', { type: 'select', options: ['采购', '资产', '合同供应商', '车辆', '证件门禁', '房产', '节能', '工会', '人事', '党群', '宣传', '财务', '档案', '安全', '综合', '其他'] }),
+      F('source_id', '依据(制度)', { type: 'ref', ref: 'rule_source', show: 'name' }),
+      F('trigger_type', '触发类型', { type: 'select', options: ['date_field', 'periodic'] }),
+      F('target_table', '作用表(date_field用)'), F('date_field', '日期字段(date_field用)'),
+      F('condition', '附加条件SQL(date_field用)'), F('lead_days', '提前天数', { type: 'number', def: 30 }),
+      F('period', '周期(periodic用)', { type: 'select', options: ['annual', 'quarterly', 'monthly'] }),
+      F('due_month', '截止月', { type: 'number' }), F('due_day', '截止日', { type: 'number' }),
+      F('obligation_tmpl', '义务标题模板(可含{title})', { full: 1 }),
+      F('evidence_required', '需要的证据', { full: 1 }),
+      F('responsible', '责任岗位'),
+      F('severity', '级别', { type: 'select', options: ['提醒', '必办', '红线'], def: '必办' }),
+      F('active', '启用', { type: 'bool', def: 1 }),
+      F('notes', '备注', { full: 1 }),
+    ],
+    hint: 'date_field=某表日期字段临期触发；periodic=周期性(annual/quarterly/monthly)。改规则即改执行，无需改代码。保存后到「合规义务」点“重新扫描”生效。',
+  },
 };
 
 const NAV = [
@@ -419,7 +440,7 @@ const NAV = [
   { group: '工会职工', items: [['staff', '职工花名册', 'Staff', 'people'], ['welfare', '福利发放', 'Welfare', 'gift']] },
   { group: '人事管理', items: [['worker', '工勤人员', 'Workers', 'people'], ['overseas', '因私出国', 'Overseas', 'plane'], ['title_eval', '职称评定', 'Titles', 'star']] },
   { group: '党群宣传', items: [['party', '党群工作', 'Party', 'flag'], ['publicity', '宣传报道', 'Publicity', 'news']] },
-  { group: '规则体系', items: [['rule_source', '制度依据库', 'Rule Sources', 'scale']] },
+  { group: '规则体系', items: [['obligations', '合规义务', 'Obligations', 'scale'], ['rule', '规则库', 'Rules', 'scale'], ['rule_source', '制度依据库', 'Rule Sources', 'book'], ['audit', '审计日志', 'Audit Log', 'todo']] },
   { group: '规章制度', items: [['regulation', '规章制度', 'Regulations', 'book']] },
   { group: '档案留存', items: [['archive_index', '档案索引', 'Archive', 'book']] },
   { group: '事务', items: [['subscription', '报刊征订', 'Subscriptions', 'news'], ['todo', '待办事项', 'Tasks', 'todo'], ['settings', '系统设置', 'Settings', 'settings']] },
@@ -437,7 +458,7 @@ const KICKER = {
   housing: 'STAFF HOUSING', visitor: 'VISITORS', worker: 'SERVICE STAFF',
   overseas: 'OVERSEAS TRAVEL', title_eval: 'TITLE REVIEW', party: 'PARTY WORK',
   publicity: 'PUBLICITY', subscription: 'SUBSCRIPTIONS', archive_index: 'ARCHIVE',
-  rule_source: 'RULE SOURCES',
+  rule_source: 'RULE SOURCES', rule: 'RULES', obligations: 'OBLIGATIONS', audit: 'AUDIT LOG',
 };
 function setTitle(key, cn) {
   const h = $('#page-title');
@@ -476,6 +497,8 @@ function route() {
   if (key === 'dashboard') return viewDashboard();
   if (key === 'subsidy') return viewSubsidy();
   if (key === 'energy_summary') return viewEnergySummary();
+  if (key === 'obligations') return viewObligations();
+  if (key === 'audit') return viewAudit();
   if (key === 'settings') return viewSettings();
   if (MODULES[key]) return viewModule(key);
   viewDashboard();
@@ -495,6 +518,7 @@ async function viewDashboard() {
     ['有效证件', c.permit, '个', 'permit', 'var(--neon-2)'], ['在执行合同', c.contract, '份', 'contract', 'var(--warn)'],
     ['在办采购', c.procurement, '项', 'cart', 'var(--orange)'], ['在用资产', c.asset, '项', 'asset', 'var(--surface-dim)'],
     ['合格供应商', c.supplier, '家', 'supplier', 'var(--neon-2)'], ['在册职工', c.staff, '人', 'people', 'var(--neon)'],
+    ['待办义务', c.obligation_open, '项', 'scale', 'var(--warn)'], ['逾期义务', c.obligation_overdue, '项', 'scale', 'var(--danger, #ef4444)'],
   ].map(([k, v, u, ic, bg]) =>
     `<div class="card"><div class="k">${k}<span class="badge" style="background:${bg}">${icon(ic)}</span></div>
      <div class="v">${v}<small> ${u}</small></div></div>`).join('');
@@ -777,6 +801,71 @@ async function viewEnergySummary() {
     $('#ego').onclick = () => { viewEnergySummary._p = $('#ep').value || period; viewEnergySummary(); };
   };
   render();
+}
+
+/* ---------- 合规义务（P2 规则引擎产出） ---------- */
+const OB_STATE = { overdue: ['已逾期', 'danger'], pending: ['待办', 'warn'], done: ['已完成', 'ok'], waived: ['已豁免', ''] };
+const SEV_CLS = { '红线': 'danger', '必办': 'warn', '提醒': '' };
+async function viewObligations() {
+  setTitle('obligations', '合规义务');
+  const actions = $('#topbar-actions'); actions.innerHTML = '';
+  const runBtn = el(`<button class="btn primary">${icon('refresh')}重新扫描规则</button>`);
+  actions.appendChild(runBtn);
+  const view = $('#view');
+  const render = async () => {
+    view.innerHTML = '<div class="empty">加载中…</div>';
+    const d = await api.get('/obligations');
+    const card = (label, v, cls) => `<div class="card"><div class="k">${label}</div><div class="v" style="color:var(--${cls})">${v}</div></div>`;
+    const rows = d.items.map(o => {
+      const [stxt, scls] = OB_STATE[o.state] || [o.state, ''];
+      const link = o.source_url ? `<a href="${esc(o.source_url)}" target="_blank" rel="noopener">${esc(o.source_name || '依据')} ↗</a>` : esc(o.source_name || '—');
+      const act = (o.state === 'pending' || o.state === 'overdue')
+        ? `<button class="btn link" data-done="${o.id}">标记完成</button>` : (o.actor ? `<span style="color:var(--muted)">${esc(o.actor)} · ${esc((o.closed_at || '').slice(0, 10))}</span>` : '');
+      return `<tr>
+        <td><span class="tag ${scls}">${stxt}</span></td>
+        <td><span class="tag ${SEV_CLS[o.severity] || ''}">${esc(o.severity || '')}</span></td>
+        <td>${esc(o.domain || '')}</td>
+        <td>${esc(o.title || '')}<div style="color:var(--muted);font-size:12px">证据：${esc(o.evidence_required || '—')}</div></td>
+        <td>${expireCell(o.due_date)}</td>
+        <td style="font-size:12.5px">${link}</td>
+        <td style="text-align:right">${act}</td></tr>`;
+    }).join('');
+    view.innerHTML = `
+      <div class="cards" style="margin-bottom:14px">
+        ${card('义务总数', d.total, 'ink')}${card('待办', d.open, 'warn')}${card('逾期', d.overdue, 'danger')}</div>
+      <div class="hint">义务由「规则库」中的规则自动生成，每条挂靠制度依据。完成需按“证据”留痕；操作全部计入审计日志。</div>
+      <div class="panel"><div class="panel-b"><div style="overflow-x:auto"><table>
+        <thead><tr><th>状态</th><th>级别</th><th>业务域</th><th>义务</th><th>到期</th><th>依据</th><th></th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="7"><div class="empty">暂无义务，请先在「规则库」配置规则并点右上角“重新扫描”</div></td></tr>`}</tbody>
+      </table></div></div></div>`;
+    view.querySelectorAll('[data-done]').forEach(b => b.onclick = async () => {
+      if (!confirm('确认该义务已完成并留痕？')) return;
+      await fetch('/api/obligation/' + b.dataset.done + '/close', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Actor': 'user' }, body: '{}' });
+      toast('已标记完成'); render();
+    });
+  };
+  runBtn.onclick = async () => { await api.post('/obligations/run', {}); toast('已重新扫描规则'); render(); };
+  render();
+}
+
+/* ---------- 审计日志（只读） ---------- */
+async function viewAudit() {
+  setTitle('audit', '审计日志');
+  $('#topbar-actions').innerHTML = '';
+  const view = $('#view'); view.innerHTML = '<div class="empty">加载中…</div>';
+  const list = await api.get('/audit_log');
+  const rows = list.map(a => `<tr>
+    <td style="white-space:nowrap">${esc(a.ts)}</td>
+    <td><span class="tag">${esc(a.actor)}</span></td>
+    <td>${esc(a.action)}</td>
+    <td>${esc(a.entity || '')}${a.entity_id ? '#' + a.entity_id : ''}</td>
+    <td>${esc(a.summary || '')}</td></tr>`).join('');
+  view.innerHTML = `
+    <div class="hint">所有写操作（新增/修改/删除/义务闭环/规则扫描）自动留痕，可追溯到操作者(actor)。AI 操作会以 ai 标注。</div>
+    <div class="panel"><div class="panel-b"><div style="overflow-x:auto"><table>
+      <thead><tr><th>时间</th><th>操作者</th><th>动作</th><th>对象</th><th>摘要</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5"><div class="empty">暂无审计记录</div></td></tr>'}</tbody>
+    </table></div></div></div>`;
 }
 
 /* ---------- 系统设置 ---------- */
