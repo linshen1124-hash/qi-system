@@ -1,8 +1,27 @@
-/* QI SYSTEM 前端 —— 纯原生 JS，无依赖 */
+/* QI SYSTEM 前端 v1.0 —— Supabase 版，零后端 */
+const SB_URL = 'https://ashxgyiiluvrbsxuuurj.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzaHhneWlpbHV2cmJzeHV1dXJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNDE2NDcsImV4cCI6MjEwMDgxNzY0N30.XfmJ3KTA-SnUdswnx9DdzRCRnxdrBLjybMeb0hLGYuY';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+const STORAGE_BUCKET = 'attachments';
+
+/* ---------- UI 基础 ---------- */
 const $ = (s, r = document) => r.querySelector(s);
 const el = (h) => { const t = document.createElement('template'); t.innerHTML = h.trim(); return t.content.firstChild; };
 const esc = (v) => v == null ? '' : String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const money = (v) => v == null ? '' : '¥' + Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/* ---------- 派生字段：前端补算 km/consumption/amount ---------- */
+function deriveFields(table, data) {
+  if (table === 'trip_record') {
+    const s = parseFloat(data.start_km), e = parseFloat(data.end_km);
+    if (!isNaN(s) && !isNaN(e) && !data.km) data.km = e - s;
+  } else if (table === 'energy_reading') {
+    const pv = parseFloat(data.prev_reading), cv = parseFloat(data.curr_reading);
+    if (!isNaN(pv) && !isNaN(cv) && !data.consumption) data.consumption = cv - pv;
+    const cons = parseFloat(data.consumption), price = parseFloat(data.unit_price);
+    if (!isNaN(cons) && !isNaN(price) && !data.amount) data.amount = Math.round(cons * price * 100) / 100;
+  }
+}
 
 /* ---------- 线条图标（描边SVG，替代emoji） ---------- */
 const ICONS = {
@@ -20,6 +39,7 @@ const ICONS = {
   bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>',
+  upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><line x1="12" y1="3" x2="12" y2="15"/>',
   energy: '<path d="M13 2 4 14h6l-1 8 9-12h-6z"/>',
   megaphone: '<path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M14 8.5a4 4 0 0 1 0 7"/>',
   book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="16" y2="11"/>',
@@ -38,12 +58,92 @@ function icon(name) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ''}</svg>`;
 }
 
-/* ---------- API ---------- */
+/* ---------- API 层（Supabase 驱动） ---------- */
+async function enrichTripRecords(rows) {
+  if (!rows || !rows.length) return rows;
+  const { data: drivers } = await sb.from('driver').select('id,name');
+  const { data: vehicles } = await sb.from('vehicle').select('id,plate');
+  const dmap = Object.fromEntries((drivers || []).map(d => [d.id, d.name]));
+  const vmap = Object.fromEntries((vehicles || []).map(v => [v.id, v.plate]));
+  return rows.map(r => ({ ...r, driver_name: dmap[r.driver_id] || '', plate: vmap[r.vehicle_id] || '' }));
+}
+
+function parsePath(path) {
+  const [base, qs] = path.replace(/^\//, '').split('?');
+  const parts = base.split('/');
+  const params = {};
+  if (qs) qs.split('&').forEach(p => { const [k, v] = p.split('='); params[k] = decodeURIComponent(v || ''); });
+  return { parts, params };
+}
+
 const api = {
-  async get(u) { const r = await fetch('/api' + u); return r.json(); },
-  async post(u, b) { const r = await fetch('/api' + u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }); return r.json(); },
-  async put(u, b) { const r = await fetch('/api' + u, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }); return r.json(); },
-  async del(u) { const r = await fetch('/api' + u, { method: 'DELETE' }); return r.json(); },
+  async get(path) {
+    const { parts, params } = parsePath(path);
+    const t = parts[0];
+
+    if (t === 'dashboard') { const { data } = await sb.rpc('get_dashboard'); return data; }
+    if (t === 'settings') { const { data } = await sb.from('setting').select('*'); return Object.fromEntries((data || []).map(r => [r.key, r.value])); }
+    if (t === 'subsidy') { const { data } = await sb.rpc('list_subsidy', { p_year: parseInt(params.year), p_month: parseInt(params.month) }); return data; }
+    if (t === 'energy' && parts[1] === 'summary') { const { data } = await sb.rpc('energy_summary', { p_period: params.period }); return data; }
+    if (t === 'obligations') { const { data } = await sb.rpc('get_obligations'); return data; }
+    if (t === 'audit_log') { const { data } = await sb.from('audit_log').select('*').order('id', { ascending: false }).limit(200); return data; }
+
+    if (t === 'dorm') {
+      if (parts[1] === 'fee-review') { const { data } = await sb.rpc('dorm_fee_review'); return data; }
+      const { data } = await sb.from('dorm').select('*').order('id', { ascending: false }); return data;
+    }
+    if (t === 'dorm_site') { const { data } = await sb.from('dorm_site').select('*').order('id', { ascending: false }); return data; }
+
+    if (t === 'attachment') {
+      const { data } = await sb.from('attachment').select('*').eq('entity', params.entity).eq('entity_id', params.id);
+      return data;
+    }
+
+    // 通用表：列表 / 单条
+    if (parts.length === 1) {
+      const { data } = await sb.from(t).select('*').order('id', { ascending: false });
+      return t === 'trip_record' ? enrichTripRecords(data) : data;
+    }
+    const { data } = await sb.from(t).select('*').eq('id', parts[1]).single();
+    return data;
+  },
+
+  async post(path, data) {
+    const { parts } = parsePath(path);
+    const t = parts[0];
+
+    if (t === 'settings') { for (const [k, v] of Object.entries(data)) await sb.from('setting').upsert({ key: k, value: String(v) }, { onConflict: 'key' }); return { ok: true }; }
+    if (t === 'subsidy' && parts[1] === 'recalc') { await sb.rpc('recalc_subsidy', { p_year: parseInt(data.year), p_month: parseInt(data.month) }); return { ok: true }; }
+    if (t === 'obligations' && parts[1] === 'run') { await sb.rpc('run_rule_engine'); const { data: r } = await sb.rpc('get_obligations'); return r; }
+    if (t === 'dorm' && parts[1] === 'fee-scan') { const { data: r } = await sb.rpc('sync_dorm_fee_todos', { p_lead: data.lead || 14 }); return { created: r }; }
+
+    // 附件上传走特殊逻辑，不走这里（见 uploadAttachment）
+    if (t === 'attachment') return { id: null };
+
+    deriveFields(t, data);
+    const { data: result } = await sb.from(t).insert(data).select();
+    return result?.[0] || { id: null };
+  },
+
+  async put(path, data) {
+    const { parts } = parsePath(path);
+    const t = parts[0], id = parseInt(parts[1]);
+    deriveFields(t, data);
+    await sb.from(t).update(data).eq('id', id);
+    return { id };
+  },
+
+  async del(path) {
+    const { parts } = parsePath(path);
+    const t = parts[0], id = parseInt(parts[1]);
+    // 删除附件时顺带删存储文件
+    if (t === 'attachment') {
+      const { data: att } = await sb.from('attachment').select('*').eq('id', id).single();
+      if (att?.stored_name) await sb.storage.from(STORAGE_BUCKET).remove([att.stored_name]);
+    }
+    await sb.from(t).delete().eq('id', id);
+    return { ok: true };
+  },
 };
 
 function toast(msg, type = 'ok') {
@@ -52,7 +152,7 @@ function toast(msg, type = 'ok') {
   setTimeout(() => t.remove(), 2200);
 }
 
-/* ---------- 模块配置：一处定义，自动生成增删改查 ---------- */
+/* ---------- 模块配置 ---------- */
 const F = (key, label, opt = {}) => ({ key, label, ...opt });
 const MODULES = {
   driver: {
@@ -365,7 +465,7 @@ const MODULES = {
       F('active', '启用', { type: 'bool', def: 1 }),
       F('notes', '备注', { full: 1 }),
     ],
-    hint: 'date_field=某表日期字段临期触发；periodic=周期性(annual/quarterly/monthly)。改规则即改执行，无需改代码。保存后到「合规义务」点“重新扫描”生效。',
+    hint: 'date_field=某表日期字段临期触发；periodic=周期性(annual/quarterly/monthly)。改规则即改执行，无需改代码。保存后到「合规义务」点"重新扫描"生效。',
   },
 };
 
@@ -382,7 +482,6 @@ const NAV = [
   { group: '综合事务', items: [['archive_index', '档案索引', 'Archive', 'book'], ['todo', '待办事项', 'Tasks', 'todo'], ['settings', '系统设置', 'Settings', 'settings']] },
 ];
 
-/* 页面英文点缀（kicker）与图标 */
 const KICKER = {
   dashboard: 'OVERVIEW', trip_record: 'TRIP RECORDS', subsidy: 'DRIVER SUBSIDIES',
   driver: 'DRIVERS', vehicle: 'VEHICLES', room: 'ROOM ALLOCATION', permit: 'PERMITS',
@@ -395,15 +494,16 @@ const KICKER = {
   publicity: 'PUBLICITY', archive_index: 'ARCHIVE',
   rule_source: 'RULE SOURCES', rule: 'RULES', obligations: 'OBLIGATIONS', audit: 'AUDIT LOG',
 };
-function setTitle(key, cn) {
-  const h = $('#page-title');
-  h.textContent = cn;
-  h.dataset.kicker = KICKER[key] || '';
-}
 
 /* ---------- 状态与引用缓存 ---------- */
 let refCache = {};
-async function loadRef(name) { if (!refCache[name]) refCache[name] = await api.get('/' + name); return refCache[name]; }
+async function loadRef(name) {
+  if (!refCache[name]) {
+    const { data } = await sb.from(name).select('*').order('id', { ascending: false });
+    refCache[name] = data;
+  }
+  return refCache[name];
+}
 function clearRef(name) { delete refCache[name]; }
 
 /* ---------- 侧栏 ---------- */
@@ -422,9 +522,7 @@ function renderNav(active) {
 }
 
 /* ---------- 路由 ---------- */
-function go(key) {
-  location.hash = key;
-}
+function go(key) { location.hash = key; }
 window.addEventListener('hashchange', route);
 function route() {
   const key = location.hash.slice(1) || 'dashboard';
@@ -446,6 +544,7 @@ async function viewDashboard() {
   $('#topbar-actions').innerHTML = '';
   const view = $('#view'); view.innerHTML = '<div class="empty">加载中…</div>';
   const d = await api.get('/dashboard');
+  if (!d) { view.innerHTML = '<div class="empty">加载失败，请检查 Supabase 连接</div>'; return; }
   overdueCount = d.overdue; renderNav('dashboard');
   const c = d.counts;
   const cards = [
@@ -459,10 +558,11 @@ async function viewDashboard() {
     `<div class="card"><div class="k">${k}<span class="badge" style="background:${bg}">${icon(ic)}</span></div>
      <div class="v">${v}<small> ${u}</small></div></div>`).join('');
 
-  const rem = d.reminders.length ? d.reminders.map(r => `
+  const rems = Array.isArray(d.reminders) ? d.reminders : [];
+  const rem = rems.length ? rems.map(r => `
     <div class="remind ${r.overdue ? 'overdue' : ''}">
       <div><div class="r-title">${esc(r.title || '—')}</div><div class="r-kind">${esc(r.kind)}</div></div>
-      <div class="r-meta">${esc(r.date)}<br>${r.days_left == null ? '' : (r.overdue ? `<span class="tag danger">逾期${-r.days_left}天</span>` : `剩 ${r.days_left} 天`)}</div>
+      <div class="r-meta">${esc(r.date || '')}<br>${r.days_left == null ? '' : (r.overdue ? `<span class="tag danger">逾期${-r.days_left}天</span>` : `剩 ${r.days_left} 天`)}</div>
     </div>`).join('') : '<div class="empty" style="color:rgba(255,255,255,.8)">近期没有到期或待办事项 🎉</div>';
 
   view.innerHTML = `
@@ -472,16 +572,56 @@ async function viewDashboard() {
       <div class="panel-b">${rem}</div>
     </div>`;
 }
-async function settingDays() { const s = await api.get('/settings'); return s.remind_days || 30; }
+async function settingDays() { const s = await api.get('/settings'); return parseInt(s.remind_days) || 30; }
 
-/* ---------- 用房分配（办公用房 / 宿舍用房 双子项）---------- */
-// 各宿舍点位床位容量（依据源排查表首行备注登记；如有变动在此调整）
+/* ---------- 用房分配 ---------- */
 const DORM_CAP = [
   ['望京经干院', 25], ['西站中雅大厦', 12], ['望京南湖中园', 5],
   ['芳群园三区15号楼', 3], ['芳古园一区14号楼', 3], ['芳群园四区1号楼', 3], ['定安东里6号楼', 3],
 ];
 const DORM_ORDER = Object.fromEntries(DORM_CAP.map(([n], i) => [n, i]));
 const DORM_STATUS = { '在住': 'ok', '未入住': 'warn', '已搬出': '', '人才公寓': 'accent' };
+
+async function generateDormNotice(dormId, years) {
+  const { data: row } = await sb.from('dorm').select('*').eq('id', dormId).single();
+  if (!row) { alert('未找到该住宿人记录'); return; }
+  const today = new Date();
+  const moveIn = new Date(row.move_in);
+  const adjDate = new Date(moveIn); adjDate.setFullYear(adjDate.getFullYear() + (years || 4));
+  const feeTiers = { 0: 400, 2: 800, 3: 1200, 4: 1500 };
+  const newFee = feeTiers[years] || 1500;
+  const effY = adjDate.getFullYear(), effM = adjDate.getMonth() + 1;
+  const w = window.open('', '_blank');
+  w.document.write(`<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<title>宿舍房费调整通知单-${row.name}</title>
+<style>
+@page{size:A4;margin:2.2cm}
+body{font-family:"Microsoft YaHei","SimSun",serif;color:#111}
+.sheet{max-width:640px;margin:32px auto;padding:28px 34px}
+h1{text-align:center;font-size:24px;letter-spacing:6px;margin:6px 0 4px}
+.date{text-align:right;font-size:15px;margin-bottom:22px}
+table{width:100%;border-collapse:collapse;font-size:16px}
+td{border:1px solid #333;padding:12px 14px}
+td.lbl{width:110px;background:#f5f5f5;text-align:center;white-space:nowrap}
+.body-cell{height:70px;vertical-align:middle;line-height:1.9}
+.sign{margin-top:34px;font-size:15px;display:flex;gap:60px}
+.toolbar{text-align:center;margin:18px 0}
+.toolbar button{font-size:14px;padding:8px 20px;cursor:pointer}
+@media print{.toolbar{display:none}.sheet{margin:0}}
+</style></head><body>
+<div class="toolbar"><button onclick="window.print()">打印 / 另存为 PDF</button></div>
+<div class="sheet">
+<h1>宿舍房费调整通知单</h1>
+<div class="date">${today.getFullYear()} 年 ${today.getMonth()+1} 月 ${today.getDate()} 日</div>
+<table>
+<tr><td class="lbl">姓　名</td><td>${esc(row.name)}</td></tr>
+<tr><td class="lbl">工作部门</td><td>${esc(row.dept||'')}</td></tr>
+<tr><td colspan="2" class="body-cell">　　自 ${effY} 年 ${effM} 月起，房费调整为 <b>${newFee}</b> 元／月。</td></tr>
+</table>
+<div class="sign"><div>部门负责人：___________</div><div>经办人：___________</div></div>
+</div></body></html>`);
+  w.document.close();
+}
 
 async function viewRoomAlloc() {
   setTitle('room', '用房分配');
@@ -498,9 +638,7 @@ async function viewRoomAlloc() {
   view.innerHTML = `
     <div class="segbar">${tab('office', '🏢 办公用房')}${tab('dorm', '🛏️ 宿舍用房')}</div>
     <div id="ra-body"><div class="empty">加载中…</div></div>`;
-  view.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => {
-    viewRoomAlloc._sub = b.dataset.sub; viewRoomAlloc();
-  });
+  view.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => { viewRoomAlloc._sub = b.dataset.sub; viewRoomAlloc(); });
 
   const body = $('#ra-body');
   if (sub === 'office') await renderOfficeRooms(body);
@@ -513,7 +651,7 @@ async function renderOfficeRooms(body) {
   const head = m.columns.map(col => { const [, label, t] = col; return `<th class="${t === 'num' || t === 'money' ? 'num' : ''}${isWrapCol(col) ? ' wrapcol' : ''}">${label}</th>`; }).join('') + '<th></th>';
   const draw = (list) => {
     body.querySelector('tbody').innerHTML = list.length ? list.map(r => rowHtml(m, r)).join('')
-      : `<tr><td colspan="${m.columns.length + 1}"><div class="empty">${rows.length ? '没有匹配的记录' : '暂无办公用房，点击右上角“新增用房”开始录入'}</div></td></tr>`;
+      : `<tr><td colspan="${m.columns.length + 1}"><div class="empty">${rows.length ? '没有匹配的记录' : '暂无办公用房，点击右上角"新增用房"开始录入'}</div></td></tr>`;
     body.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openForm('room', rows.find(r => r.id == b.dataset.edit)));
     body.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delRow('room', b.dataset.del));
   };
@@ -523,22 +661,19 @@ async function renderOfficeRooms(body) {
     <div class="panel"><div class="panel-b"><div style="overflow-x:auto">
       <table><thead><tr>${head}</tr></thead><tbody></tbody></table></div></div></div>`;
   draw(rows);
-  const q = body.querySelector('#ro-q');
-  q.oninput = () => { const s = q.value.trim().toLowerCase(); draw(s ? rows.filter(r => Object.values(r).some(v => String(v ?? '').toLowerCase().includes(s))) : rows); };
+  body.querySelector('#ro-q').oninput = () => { const s = body.querySelector('#ro-q').value.trim().toLowerCase(); draw(s ? rows.filter(r => Object.values(r).some(v => String(v ?? '').toLowerCase().includes(s))) : rows); };
 }
 
 async function renderDormRooms(body) {
   const [rows, sitesRaw, feeReview] = await Promise.all([
     api.get('/dorm'), api.get('/dorm_site'), api.get('/dorm/fee-review')]);
-  const cntBy = (st) => rows.filter(r => r.status === st).length;
-  const occupied = rows.filter(r => r.status !== '已搬出');  // 物理占用床位（在住 + 人才公寓）
-  // 按既定地理顺序排列点位（新加点位排末尾）
+  const occupied = rows.filter(r => r.status !== '已搬出');
   const sites = [...sitesRaw].sort((a, b) => (DORM_ORDER[a.region] ?? 99) - (DORM_ORDER[b.region] ?? 99));
-  const order = {}; sites.forEach((s, i) => order[s.region] = i);
+  const order = {};
+  sites.forEach((s, i) => order[s.region] = i);
   const orderOf = (region) => (region in order ? order[region] : (DORM_ORDER[region] ?? 99));
   const cap = sites.reduce((a, s) => a + (s.capacity || 0), 0);
 
-  // 产权性质汇总（自有 / 租用）
   const own = sites.filter(s => s.tenure === '自有');
   const rent = sites.filter(s => s.tenure === '租用');
   const ownCap = own.reduce((a, s) => a + (s.capacity || 0), 0);
@@ -546,7 +681,6 @@ async function renderDormRooms(body) {
   const rentAnnual = rent.reduce((a, s) => a + (s.annual_rent || 0), 0);
   const tenureTag = (t) => `<span class="tag ${t === '自有' ? 'ok' : 'warn'}">${esc(t || '—')}</span>`;
 
-  // 空床位汇总（按点位）：占用含在住与人才公寓，仅排除已搬出
   const capRows = sites.map(s => {
     const occ = occupied.filter(r => r.region === s.region).length;
     const free = (s.capacity || 0) - occ;
@@ -584,8 +718,7 @@ async function renderDormRooms(body) {
     body.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delRow('dorm', b.dataset.del));
   };
 
-  // 管理费调档（阶梯收费）：把每个在住人员按入住时间捋一遍
-  const soon = feeReview.filter(x => x.next && x.next.days_left <= 14).length;
+  const soon = (feeReview || []).filter(x => x.next && x.next.days_left <= 14).length;
   const feeRow = (x) => {
     const n = x.next;
     const soonBg = n && n.days_left <= 14 ? ' style="background:rgba(224,164,0,.14)"' : '';
@@ -598,9 +731,18 @@ async function renderDormRooms(body) {
       <td>${n ? (n.days_left <= 14 ? `<span class="tag warn">剩${n.days_left}天</span>` : `剩${n.days_left}天`) : ''}</td>
       <td class="actions">${n ? `<button class="btn link" data-notice="${x.id}" data-years="${n.years}">通知单</button>` : ''}</td></tr>`;
   };
-  const feeRowsHtml = feeReview.length ? feeReview.map(feeRow).join('')
+  const feeRowsHtml = (feeReview || []).length ? (feeReview || []).map(feeRow).join('')
     : `<tr><td colspan="10"><div class="empty">暂无在住普通宿舍人员</div></td></tr>`;
-  const feePanel = `
+
+  body.innerHTML = `
+    <div class="mini-cards">${cards}</div>
+    <div class="panel"><div class="panel-h"><h2><span class="ic">${icon('room')}</span>各点位空床位</h2>
+      <span class="hint" style="margin:0">自有 ${own.length}点/${ownCap}床 · 租用 ${rent.length}点/${rentCap}床</span></div>
+      <div class="panel-b"><div style="overflow-x:auto"><table>
+      <thead><tr><th>宿舍地区</th><th>性质</th><th class="num">床位容量</th><th class="num">占用</th><th class="num">空床位</th><th class="num">年租金(元)</th><th></th></tr></thead>
+      <tbody>${capRows}</tbody>
+      <tfoot><tr><td colspan="2" style="text-align:right"><b>合计</b></td><td class="num"><b>${cap}</b></td><td class="num"><b>${occupied.length}</b></td><td class="num"><b>${cap - occupied.length}</b></td><td class="num"><b>${rentAnnual ? money(rentAnnual) : ''}</b></td><td></td></tr></tfoot>
+      </table></div></div></div>
     <div class="panel"><div class="panel-h">
       <h2><span class="ic">${icon('scale')}</span>管理费调档（阶梯收费）</h2>
       <div style="display:flex;gap:10px;align-items:center">
@@ -612,18 +754,7 @@ async function renderDormRooms(body) {
       <tbody>${feeRowsHtml}</tbody></table></div></div>
       <div class="hint" style="margin:14px 18px 4px;background:transparent;box-shadow:none;border:none;padding:0;font-weight:400;color:var(--muted)">
         阶梯标准：前两年400 · 第三年800 · 第四年1200 · 第五年起1500元/月（《单身职工宿舍管理办法》第十九条）。调档周年前14天自动进待办；「通知单」按模板生成《宿舍房费调整通知单》。
-      </div></div>`;
-
-  body.innerHTML = `
-    <div class="mini-cards">${cards}</div>
-    <div class="panel"><div class="panel-h"><h2><span class="ic">${icon('room')}</span>各点位空床位</h2>
-      <span class="hint" style="margin:0">自有 ${own.length}点/${ownCap}床 · 租用 ${rent.length}点/${rentCap}床</span></div>
-      <div class="panel-b"><div style="overflow-x:auto"><table>
-      <thead><tr><th>宿舍地区</th><th>性质</th><th class="num">床位容量</th><th class="num">占用</th><th class="num">空床位</th><th class="num">年租金(元)</th><th></th></tr></thead>
-      <tbody>${capRows}</tbody>
-      <tfoot><tr><td colspan="2" style="text-align:right"><b>合计</b></td><td class="num"><b>${cap}</b></td><td class="num"><b>${occupied.length}</b></td><td class="num"><b>${cap - occupied.length}</b></td><td class="num"><b>${rentAnnual ? money(rentAnnual) : ''}</b></td><td></td></tr></tfoot>
-      </table></div></div></div>
-    ${feePanel}
+      </div></div>
     <div class="toolbar"><input id="dm-q" placeholder="搜索姓名/房号/部门…" style="width:260px">
       <span class="hint" style="margin:0">共 ${rows.length} 条床位记录（按地区·房号·床位排序）</span><div class="spacer"></div></div>
     <div class="panel"><div class="panel-b"><div style="overflow-x:auto"><table>
@@ -631,17 +762,18 @@ async function renderDormRooms(body) {
       <tbody id="dorm-tbody"></tbody></table></div></div></div>`;
   draw(sorted);
   body.querySelectorAll('[data-site]').forEach(b => b.onclick = () => openForm('dorm_site', sites.find(s => s.id == b.dataset.site)));
-  body.querySelectorAll('[data-notice]').forEach(b => b.onclick = () => window.open(`/dorm/notice?id=${b.dataset.notice}&years=${b.dataset.years}`, '_blank'));
+  body.querySelectorAll('[data-notice]').forEach(b => b.onclick = () => generateDormNotice(b.dataset.notice, parseInt(b.dataset.years)));
   body.querySelector('#fee-scan').onclick = async () => {
     const r = await api.post('/dorm/fee-scan', {});
     toast(r.created ? `已新建 ${r.created} 条调档提醒（已进待办/看板）` : '暂无需新建的提醒');
     viewRoomAlloc();
   };
-  const q = body.querySelector('#dm-q');
-  q.oninput = () => { const s = q.value.trim().toLowerCase(); draw(s ? sorted.filter(r => Object.values(r).some(v => String(v ?? '').toLowerCase().includes(s))) : sorted); };
+  body.querySelector('#dm-q').oninput = () => { const s = body.querySelector('#dm-q').value.trim().toLowerCase(); draw(s ? sorted.filter(r => Object.values(r).some(v => String(v ?? '').toLowerCase().includes(s))) : sorted); };
 }
 
 /* ---------- 通用模块视图 ---------- */
+function setTitle(key, cn) { const h = $('#page-title'); h.textContent = cn; h.dataset.kicker = KICKER[key] || ''; }
+
 async function viewModule(key) {
   const m = MODULES[key];
   setTitle(key, m.title);
@@ -655,11 +787,11 @@ async function viewModule(key) {
 
   const head = m.columns.map(col => { const [, label, t] = col; return `<th class="${t === 'num' || t === 'money' ? 'num' : ''}${isWrapCol(col) ? ' wrapcol' : ''}">${label}</th>`; }).join('') + '<th></th>';
 
-  const CAP = 300;  // 大台账只渲染前 N 行，避免上千行卡顿；搜索仍过滤全量
+  const CAP = 300;
   const renderBody = (list) => {
     const shown = list.slice(0, CAP);
     view.querySelector('tbody').innerHTML = shown.length ? shown.map(r => rowHtml(m, r)).join('')
-      : `<tr><td colspan="${m.columns.length + 1}"><div class="empty">${rows.length ? '没有匹配的记录' : '暂无数据，点击右上角“新增”开始录入'}</div></td></tr>`;
+      : `<tr><td colspan="${m.columns.length + 1}"><div class="empty">${rows.length ? '没有匹配的记录' : '暂无数据，点击右上角"新增"开始录入'}</div></td></tr>`;
     const cnt = view.querySelector('#row-count');
     if (cnt) cnt.textContent = list.length > CAP ? `共 ${list.length} 条，显示前 ${CAP} 条（用搜索缩小范围）` : `共 ${list.length} 条`;
     view.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openForm(key, rows.find(r => r.id == b.dataset.edit)));
@@ -677,9 +809,8 @@ async function viewModule(key) {
     </div></div></div>`;
 
   renderBody(rows);
-  const search = view.querySelector('#tbl-search');
-  search.oninput = () => {
-    const q = search.value.trim().toLowerCase();
+  view.querySelector('#tbl-search').oninput = () => {
+    const q = view.querySelector('#tbl-search').value.trim().toLowerCase();
     renderBody(q ? rows.filter(r => Object.values(r).some(v => String(v ?? '').toLowerCase().includes(q))) : rows);
   };
 }
@@ -703,15 +834,13 @@ function expireCell(v) {
   if (left <= 30) return `${esc(v)} <span class="tag warn">剩${left}天</span>`;
   return esc(v);
 }
-// 需要换行+限宽的长文本列（否则会把表撑出视口、挤掉操作列）
-const WRAP_KEYS = new Set(['notes', 'route', 'reason', 'spec', 'tech_req', 'biz_req',
-  'owner_address', 'other_note', 'series', 'address']);
+const WRAP_KEYS = new Set(['notes', 'route', 'reason', 'spec', 'tech_req', 'biz_req', 'owner_address', 'other_note', 'series', 'address']);
 function isWrapCol(col) { return WRAP_KEYS.has(col[0]) || col[1] === '备注'; }
 
 function rowHtml(m, r) {
   const tds = m.columns.map(col => {
     const [, , t] = col;
-    if (t === 'num' || t === 'money') return cellHtml(r, col); // 已含<td>
+    if (t === 'num' || t === 'money') return cellHtml(r, col);
     return `<td class="${isWrapCol(col) ? 'wrapcol' : ''}">${cellHtml(r, col)}</td>`;
   }).join('');
   return `<tr>${tds}<td class="actions">
@@ -729,7 +858,6 @@ async function delRow(key, id) {
 /* ---------- 通用表单弹窗 ---------- */
 async function openForm(key, row) {
   const m = MODULES[key];
-  // 预加载引用下拉
   for (const f of m.fields) if (f.type === 'ref') await loadRef(f.ref);
 
   const fieldsHtml = (await Promise.all(m.fields.map(f => fieldHtml(f, row)))).join('');
@@ -785,27 +913,29 @@ async function fieldHtml(f, row) {
   return `<div class="${cls}"><label>${f.label}${f.req ? ' *' : ''}</label><input type="${type}" ${step} name="${f.key}" value="${esc(v)}"></div>`;
 }
 
-/* ---------- 附件 ---------- */
+/* ---------- 附件（Supabase Storage） ---------- */
 async function renderAttach(box, entity, id) {
   const list = await api.get(`/attachment?entity=${entity}&id=${id}`);
-  const rows = list.map(a => `<div class="att-row">📎 <a href="/api/download/${a.id}" target="_blank">${esc(a.filename)}</a>
-    <span style="color:var(--muted)">${(a.size / 1024).toFixed(0)}KB</span>
-    <button class="btn link danger sm" data-datt="${a.id}" style="margin-left:auto">删除</button></div>`).join('');
+  const rows = (list || []).map(a => {
+    const url = sb.storage.from(STORAGE_BUCKET).getPublicUrl(a.stored_name).data.publicUrl;
+    return `<div class="att-row">📎 <a href="${url}" target="_blank">${esc(a.filename)}</a>
+      <span style="color:var(--muted)">${(a.size / 1024).toFixed(0)}KB</span>
+      <button class="btn link danger sm" data-datt="${a.id}" style="margin-left:auto">删除</button></div>`;
+  }).join('');
   box.innerHTML = `<div class="att-list">${rows || '<span style="color:var(--muted);font-size:12px">暂无附件</span>'}</div>
     <div style="margin-top:8px"><input type="file" id="att-file"></div>`;
   box.querySelectorAll('[data-datt]').forEach(b => b.onclick = async () => { await api.del('/attachment/' + b.dataset.datt); renderAttach(box, entity, id); });
-  box.querySelector('#att-file').onchange = (e) => {
+  box.querySelector('#att-file').onchange = async (e) => {
     const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      await api.post('/attachment', { entity, entity_id: id, filename: file.name, content: reader.result });
-      toast('附件已上传'); renderAttach(box, entity, id);
-    };
-    reader.readAsDataURL(file);
+    const path = `${entity}/${id}/${Date.now()}_${file.name}`;
+    const { error: upErr } = await sb.storage.from(STORAGE_BUCKET).upload(path, file);
+    if (upErr) { toast('上传失败: ' + upErr.message, 'err'); return; }
+    await sb.from('attachment').insert({ entity, entity_id: id, filename: file.name, stored_name: path, size: file.size });
+    toast('附件已上传'); renderAttach(box, entity, id);
   };
 }
 
-/* ---------- 司机补助（特殊视图） ---------- */
+/* ---------- 司机补助 ---------- */
 async function viewSubsidy() {
   setTitle('subsidy', '司机补助结算');
   const now = new Date();
@@ -819,7 +949,7 @@ async function viewSubsidy() {
     view.innerHTML = '<div class="empty">加载中…</div>';
     const list = await api.get(`/subsidy?year=${y}&month=${mo}`);
     const s = await api.get('/settings');
-    const rows = list.map(r => `<tr>
+    const rows = (list || []).map(r => `<tr>
       <td>${esc(r.driver_name)}</td>
       <td class="num">${r.total_km}</td>
       <td class="num">${money(r.km_amount)}</td>
@@ -830,7 +960,7 @@ async function viewSubsidy() {
       <td>${esc(r.other_note || '')}</td>
       <td style="text-align:right"><button class="btn link" data-adj='${JSON.stringify({ driver_id: r.driver_id, name: r.driver_name, id: r.id, other_amount: r.other_amount, other_note: r.other_note })}'>调整</button></td>
     </tr>`).join('');
-    const total = list.reduce((a, r) => a + (r.total_amount || 0), 0);
+    const total = (list || []).reduce((a, r) => a + (r.total_amount || 0), 0);
     view.innerHTML = `
       <div class="toolbar">
         <label>年月：</label>
@@ -876,7 +1006,7 @@ async function adjustSubsidy(rec, y, mo, after) {
   };
 }
 
-/* ---------- 能耗汇总（特殊视图） ---------- */
+/* ---------- 能耗汇总 ---------- */
 async function viewEnergySummary() {
   setTitle('energy_summary', '能耗汇总');
   const now = new Date();
@@ -887,7 +1017,7 @@ async function viewEnergySummary() {
   const render = async () => {
     view.innerHTML = '<div class="empty">加载中…</div>';
     const d = await api.get('/energy/summary?period=' + encodeURIComponent(period));
-    const rows = d.rows.length ? d.rows.map(r => `<tr>
+    const rows = (d && d.rows && d.rows.length) ? d.rows.map(r => `<tr>
       <td>${esc(r.energy_type)}</td>
       <td class="num">${r.consumption}</td>
       <td class="num">${money(r.amount)}</td>
@@ -904,14 +1034,14 @@ async function viewEnergySummary() {
       <div class="panel"><div class="panel-b"><div style="overflow-x:auto"><table>
         <thead><tr><th>能源类型</th><th class="num">用量合计</th><th class="num">费用合计</th><th class="num">记录数</th></tr></thead>
         <tbody>${rows}</tbody>
-        <tfoot><tr><td style="text-align:right"><b>费用总计</b></td><td class="num"></td><td class="num"><b>${money(d.total_amount)}</b></td><td class="num"></td></tr></tfoot>
+        <tfoot><tr><td style="text-align:right"><b>费用总计</b></td><td class="num"></td><td class="num"><b>${money(d ? d.total_amount : 0)}</b></td><td class="num"></td></tr></tfoot>
       </table></div></div></div>`;
     $('#ego').onclick = () => { viewEnergySummary._p = $('#ep').value || period; viewEnergySummary(); };
   };
   render();
 }
 
-/* ---------- 合规义务（P2 规则引擎产出） ---------- */
+/* ---------- 合规义务 ---------- */
 const OB_STATE = { overdue: ['已逾期', 'danger'], pending: ['待办', 'warn'], done: ['已完成', 'ok'], waived: ['已豁免', ''] };
 const SEV_CLS = { '红线': 'danger', '必办': 'warn', '提醒': '' };
 async function viewObligations() {
@@ -924,7 +1054,7 @@ async function viewObligations() {
     view.innerHTML = '<div class="empty">加载中…</div>';
     const d = await api.get('/obligations');
     const card = (label, v, cls) => `<div class="card"><div class="k">${label}</div><div class="v" style="color:var(--${cls})">${v}</div></div>`;
-    const rows = d.items.map(o => {
+    const rows = (d.items || []).map(o => {
       const [stxt, scls] = OB_STATE[o.state] || [o.state, ''];
       const link = o.source_url ? `<a href="${esc(o.source_url)}" target="_blank" rel="noopener">${esc(o.source_name || '依据')} ↗</a>` : esc(o.source_name || '—');
       const act = (o.state === 'pending' || o.state === 'overdue')
@@ -941,14 +1071,14 @@ async function viewObligations() {
     view.innerHTML = `
       <div class="cards" style="margin-bottom:14px">
         ${card('义务总数', d.total, 'ink')}${card('待办', d.open, 'warn')}${card('逾期', d.overdue, 'danger')}</div>
-      <div class="hint">义务由「规则库」中的规则自动生成，每条挂靠制度依据。完成需按“证据”留痕；操作全部计入审计日志。</div>
+      <div class="hint">义务由「规则库」中的规则自动生成，每条挂靠制度依据。完成需按"证据"留痕；操作全部计入审计日志。</div>
       <div class="panel"><div class="panel-b"><div style="overflow-x:auto"><table>
         <thead><tr><th>状态</th><th>级别</th><th>业务域</th><th>义务</th><th>到期</th><th>依据</th><th></th></tr></thead>
-        <tbody>${rows || `<tr><td colspan="7"><div class="empty">暂无义务，请先在「规则库」配置规则并点右上角“重新扫描”</div></td></tr>`}</tbody>
+        <tbody>${rows || `<tr><td colspan="7"><div class="empty">暂无义务，请先在「规则库」配置规则并点右上角"重新扫描"</div></td></tr>`}</tbody>
       </table></div></div></div>`;
     view.querySelectorAll('[data-done]').forEach(b => b.onclick = async () => {
       if (!confirm('确认该义务已完成并留痕？')) return;
-      await fetch('/api/obligation/' + b.dataset.done + '/close', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Actor': 'user' }, body: '{}' });
+      await sb.rpc('close_obligation', { p_id: parseInt(b.dataset.done), p_actor: 'user' });
       toast('已标记完成'); render();
     });
   };
@@ -956,13 +1086,13 @@ async function viewObligations() {
   render();
 }
 
-/* ---------- 审计日志（只读） ---------- */
+/* ---------- 审计日志 ---------- */
 async function viewAudit() {
   setTitle('audit', '审计日志');
   $('#topbar-actions').innerHTML = '';
   const view = $('#view'); view.innerHTML = '<div class="empty">加载中…</div>';
   const list = await api.get('/audit_log');
-  const rows = list.map(a => `<tr>
+  const rows = (list || []).map(a => `<tr>
     <td style="white-space:nowrap">${esc(a.ts)}</td>
     <td><span class="tag">${esc(a.actor)}</span></td>
     <td>${esc(a.action)}</td>

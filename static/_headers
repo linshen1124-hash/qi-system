@@ -1,0 +1,19 @@
+# Cloudflare Pages configuration
+
+# API endpoints — all calls to Supabase directly from browser, so these are purely static files
+/*
+  Access-Control-Allow-Origin: *
+
+# Fonts — cache aggressively (1 year)
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# CSS & JS — cache for 1 day (fingerprint via query param for cache busting)
+/*.css
+  Cache-Control: public, max-age=86400
+/*.js
+  Cache-Control: public, max-age=86400
+
+# HTML — never cache (SPA)
+/*.html
+  Cache-Control: no-cache
