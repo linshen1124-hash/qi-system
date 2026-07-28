@@ -29,6 +29,12 @@ def api(method, path, data=None):
         print(f"  ERROR {method} {path}: {e.code} - {body[:200]}")
         return None
 
+def _get_api(table):
+    url = f"{SB_URL}/rest/v1/{table}?select=*"
+    headers = {"apikey": SB_KEY}
+    req = urllib.request.Request(url, headers=headers)
+    return json.loads(urllib.request.urlopen(req).read())
+
 def insert(table, rows):
     if not rows:
         return 0
@@ -39,6 +45,9 @@ def insert(table, rows):
 # 1. 司机数据
 # ============================================================
 def import_drivers():
+    if len(_get_api("/driver?select=id&limit=1")) > 0:
+        print("司机: 已有数据，跳过")
+        return
     drivers = [
         {"name": "李超", "phone": "", "active": True, "notes": "历史行车记录中"},
         {"name": "殷少杰", "phone": "", "active": True, "notes": "历史行车记录中"},
@@ -66,16 +75,22 @@ def import_vehicles():
 # 3. 行车记录
 # ============================================================
 def import_trips():
+    # Get actual driver/vehicle IDs
+    drivers = _get_api("/driver")
+    vehicles = _get_api("/vehicle")
+    dmap = {d["name"]: d["id"] for d in drivers}
+    vmap = {v["plate"]: v["id"] for v in vehicles}
+
     trips = [
-        {"date": "2026-07-24", "driver_id": 3, "vehicle_id": 1, "dept": "办公室",
+        {"date": "2026-07-24", "driver_id": dmap.get("滕俊圻"), "vehicle_id": vmap.get("京LJC639"), "dept": "办公室",
          "route": "院-万寿路27号院", "km": 90, "passenger": "刘干事", "overtime_h": 1},
-        {"date": "2026-07-19", "driver_id": 2, "vehicle_id": 2, "dept": "科技处",
+        {"date": "2026-07-19", "driver_id": dmap.get("殷少杰"), "vehicle_id": vmap.get("京N8VH20"), "dept": "科技处",
          "route": "院-首都机场", "km": 250, "passenger": "外宾接待", "overtime_h": 6},
-        {"date": "2026-07-11", "driver_id": 2, "vehicle_id": 2, "dept": "人事处",
+        {"date": "2026-07-11", "driver_id": dmap.get("殷少杰"), "vehicle_id": vmap.get("京N8VH20"), "dept": "人事处",
          "route": "院-部机关", "km": 110, "passenger": "张主任", "overtime_h": 3},
-        {"date": "2026-07-08", "driver_id": 1, "vehicle_id": 3, "dept": "财务处",
+        {"date": "2026-07-08", "driver_id": dmap.get("李超"), "vehicle_id": vmap.get("京N3TG17"), "dept": "财务处",
          "route": "院-银行", "km": 130, "passenger": "李会计", "overtime_h": 2},
-        {"date": "2026-07-03", "driver_id": 1, "vehicle_id": 3, "dept": "办公室",
+        {"date": "2026-07-03", "driver_id": dmap.get("李超"), "vehicle_id": vmap.get("京N3TG17"), "dept": "办公室",
          "route": "院-部机关", "km": 80, "passenger": "王主任", "overtime_h": 0},
     ]
     n = insert("trip_record", trips)

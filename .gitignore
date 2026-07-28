@@ -7,3 +7,4 @@ uploads/*
 tmp_pdf_images/
 QI_SYSTEM.app/
 .claude/
+node_modules/
