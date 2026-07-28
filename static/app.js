@@ -377,6 +377,18 @@ const MODULES = {
     ],
     hint: '填了份数与单价、金额留空系统自动计算(份数×单价)。',
   },
+  archive_index: {
+    title: '档案索引', table: 'archive_index', icon: '🗂️',
+    columns: [['year', '年度', 'num'], ['domain', '业务域'], ['filename', '文件名'], ['ftype', '类型'], ['size', '大小', 'num'], ['source', '来源']],
+    fields: [
+      F('filename', '文件名', { req: 1, full: 1 }),
+      F('path', '相对路径', { full: 1 }),
+      F('domain', '业务域'), F('year', '年度', { type: 'number' }),
+      F('ftype', '文件类型'), F('size', '字节', { type: 'number' }),
+      F('source', '来源'), F('notes', '备注', { full: 1 }),
+    ],
+    hint: '历年工作成果的可检索目录（源文件保留在 qi-bangong）。用上方搜索框按文件名/业务域/年度快速定位。',
+  },
 };
 
 const NAV = [
@@ -391,6 +403,7 @@ const NAV = [
   { group: '人事管理', items: [['worker', '工勤人员', 'Workers', 'people'], ['overseas', '因私出国', 'Overseas', 'plane'], ['title_eval', '职称评定', 'Titles', 'star']] },
   { group: '党群宣传', items: [['party', '党群工作', 'Party', 'flag'], ['publicity', '宣传报道', 'Publicity', 'news']] },
   { group: '规章制度', items: [['regulation', '规章制度', 'Regulations', 'book']] },
+  { group: '档案留存', items: [['archive_index', '档案索引', 'Archive', 'book']] },
   { group: '事务', items: [['subscription', '报刊征订', 'Subscriptions', 'news'], ['todo', '待办事项', 'Tasks', 'todo'], ['settings', '系统设置', 'Settings', 'settings']] },
 ];
 
@@ -405,7 +418,7 @@ const KICKER = {
   supplier_eval: 'SUPPLIER EVAL', staff: 'STAFF ROSTER', welfare: 'WELFARE',
   housing: 'STAFF HOUSING', visitor: 'VISITORS', worker: 'SERVICE STAFF',
   overseas: 'OVERSEAS TRAVEL', title_eval: 'TITLE REVIEW', party: 'PARTY WORK',
-  publicity: 'PUBLICITY', subscription: 'SUBSCRIPTIONS',
+  publicity: 'PUBLICITY', subscription: 'SUBSCRIPTIONS', archive_index: 'ARCHIVE',
 };
 function setTitle(key, cn) {
   const h = $('#page-title');
@@ -496,10 +509,13 @@ async function viewModule(key) {
 
   const head = m.columns.map(([, label, t]) => `<th class="${t === 'num' || t === 'money' ? 'num' : ''}">${label}</th>`).join('') + '<th></th>';
 
+  const CAP = 300;  // 大台账只渲染前 N 行，避免上千行卡顿；搜索仍过滤全量
   const renderBody = (list) => {
-    view.querySelector('tbody').innerHTML = list.length ? list.map(r => rowHtml(m, r)).join('')
+    const shown = list.slice(0, CAP);
+    view.querySelector('tbody').innerHTML = shown.length ? shown.map(r => rowHtml(m, r)).join('')
       : `<tr><td colspan="${m.columns.length + 1}"><div class="empty">${rows.length ? '没有匹配的记录' : '暂无数据，点击右上角“新增”开始录入'}</div></td></tr>`;
-    const cnt = view.querySelector('#row-count'); if (cnt) cnt.textContent = `共 ${list.length} 条`;
+    const cnt = view.querySelector('#row-count');
+    if (cnt) cnt.textContent = list.length > CAP ? `共 ${list.length} 条，显示前 ${CAP} 条（用搜索缩小范围）` : `共 ${list.length} 条`;
     view.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openForm(key, rows.find(r => r.id == b.dataset.edit)));
     view.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delRow(key, b.dataset.del));
   };

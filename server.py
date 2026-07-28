@@ -63,6 +63,7 @@ TABLES = {
     "party": ["date", "category", "title", "participants", "owner", "status", "notes"],
     "publicity": ["date", "category", "title", "channel", "author", "status", "notes"],
     "subscription": ["year", "name", "copies", "unit_price", "amount", "dept", "notes"],
+    "archive_index": ["path", "filename", "domain", "year", "ftype", "size", "source", "notes"],
 }
 
 

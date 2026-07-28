@@ -379,6 +379,20 @@ CREATE TABLE IF NOT EXISTS subscription (
     notes      TEXT
 );
 
+-- ============ 模块十三：档案索引（留存过去·可检索可溯源）============
+CREATE TABLE IF NOT EXISTS archive_index (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    path     TEXT,                  -- 相对档案根的路径
+    filename TEXT,                  -- 文件名
+    domain   TEXT,                  -- 业务域（采购/资产/合同供应商/...）
+    year     INTEGER,               -- 年度（从路径/文件名推断）
+    ftype    TEXT,                  -- 文件类型（docx/xlsx/pdf...）
+    size     INTEGER,               -- 字节
+    source   TEXT,                  -- 顶层来源（如 七星）
+    indexed  TEXT DEFAULT (datetime('now','localtime')),
+    notes    TEXT
+);
+
 -- ============ 待办 / 附件 ============
 CREATE TABLE IF NOT EXISTS todo (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
