@@ -33,6 +33,7 @@ const ICONS = {
   flag: '<path d="M4 21V4"/><path d="M4 4h12l-2 3.5L16 11H4"/>',
   news: '<path d="M4 5h13v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M17 8h3v11a1 1 0 0 1-1 1"/><line x1="7" y1="9" x2="14" y2="9"/><line x1="7" y1="13" x2="14" y2="13"/><line x1="7" y1="17" x2="11" y2="17"/>',
   people: '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 6a3 3 0 0 1 0 6"/><path d="M18 20a6 6 0 0 0-3-5.2"/>',
+  scale: '<path d="M12 3v18"/><path d="M7 7h10"/><path d="M7 7l-3.5 6a3.5 3.5 0 0 0 7 0z"/><path d="M17 7l3.5 6a3.5 3.5 0 0 1-7 0z"/><path d="M8 21h8"/>',
 };
 function icon(name) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ''}</svg>`;
@@ -389,6 +390,22 @@ const MODULES = {
     ],
     hint: '历年工作成果的可检索目录（源文件保留在 qi-bangong）。用上方搜索框按文件名/业务域/年度快速定位。',
   },
+  rule_source: {
+    title: '制度依据库', table: 'rule_source', icon: '⚖️',
+    columns: [['name', '制度名称'], ['doc_no', '文号'], ['issuer', '发文机关'], ['level', '层级'], ['domain', '业务域'], ['year', '年份', 'num'], ['url', '来源', 'link'], ['status', '状态', 'status']],
+    fields: [
+      F('name', '制度名称', { req: 1, full: 1 }),
+      F('doc_no', '文号'), F('issuer', '发文机关'),
+      F('level', '层级', { type: 'select', options: ['国家法规', '中央文件', '部委规章', '北京市', '区级', '院级', '后勤自拟', '关联公司', '其他'] }),
+      F('domain', '业务域', { type: 'select', options: ['采购', '资产', '合同供应商', '车辆', '证件门禁', '房产', '节能', '工会', '人事', '党群', '宣传', '财务', '档案', '安全', '综合', '其他'] }),
+      F('year', '发布/施行年份', { type: 'number' }),
+      F('url', '来源链接(外部公开)', { full: 1 }),
+      F('source_file', '内部档案相对路径', { full: 1 }),
+      F('status', '状态', { type: 'select', options: ['现行有效', '已废止', '修订中'], def: '现行有效' }),
+      F('notes', '备注', { full: 1 }),
+    ],
+    hint: '规则层的权威依据：内部院级制度 + 外部主管部门法规。每条规则(rule)将挂靠此处一份依据。用搜索框按业务域/发文机关定位。',
+  },
 };
 
 const NAV = [
@@ -402,6 +419,7 @@ const NAV = [
   { group: '工会职工', items: [['staff', '职工花名册', 'Staff', 'people'], ['welfare', '福利发放', 'Welfare', 'gift']] },
   { group: '人事管理', items: [['worker', '工勤人员', 'Workers', 'people'], ['overseas', '因私出国', 'Overseas', 'plane'], ['title_eval', '职称评定', 'Titles', 'star']] },
   { group: '党群宣传', items: [['party', '党群工作', 'Party', 'flag'], ['publicity', '宣传报道', 'Publicity', 'news']] },
+  { group: '规则体系', items: [['rule_source', '制度依据库', 'Rule Sources', 'scale']] },
   { group: '规章制度', items: [['regulation', '规章制度', 'Regulations', 'book']] },
   { group: '档案留存', items: [['archive_index', '档案索引', 'Archive', 'book']] },
   { group: '事务', items: [['subscription', '报刊征订', 'Subscriptions', 'news'], ['todo', '待办事项', 'Tasks', 'todo'], ['settings', '系统设置', 'Settings', 'settings']] },
@@ -419,6 +437,7 @@ const KICKER = {
   housing: 'STAFF HOUSING', visitor: 'VISITORS', worker: 'SERVICE STAFF',
   overseas: 'OVERSEAS TRAVEL', title_eval: 'TITLE REVIEW', party: 'PARTY WORK',
   publicity: 'PUBLICITY', subscription: 'SUBSCRIPTIONS', archive_index: 'ARCHIVE',
+  rule_source: 'RULE SOURCES',
 };
 function setTitle(key, cn) {
   const h = $('#page-title');
@@ -545,6 +564,7 @@ function cellHtml(r, col) {
   if (t === 'num') return `<td class="num">${v == null ? '' : v}</td>`;
   if (t === 'money') return `<td class="num">${v == null ? '' : money(v)}</td>`;
   if (t === 'status') { const cls = v === '有效' || v === '履行中' || v === '已完成' ? 'ok' : (v === '作废' || v === '已结束' ? '' : 'warn'); return `<span class="tag ${cls}">${esc(v)}</span>`; }
+  if (t === 'link') return v ? `<a href="${esc(v)}" target="_blank" rel="noopener">链接 ↗</a>` : '';
   if (t === 'paid') return v ? '<span class="tag ok">已缴</span>' : '<span class="tag warn">未缴</span>';
   if (t === 'expire') return expireCell(v);
   return esc(v);

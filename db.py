@@ -393,6 +393,21 @@ CREATE TABLE IF NOT EXISTS archive_index (
     notes    TEXT
 );
 
+-- ============ 模块十四：制度依据库（P2 规则层·规则挂靠的权威依据）============
+CREATE TABLE IF NOT EXISTS rule_source (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,      -- 制度名称
+    doc_no      TEXT,               -- 文号
+    issuer      TEXT,               -- 发文机关
+    level       TEXT,               -- 层级：国家法规/中央文件/部委规章/北京市/区级/院级/后勤自拟/关联公司
+    domain      TEXT,               -- 业务域
+    year        INTEGER,            -- 发布/施行年份
+    url         TEXT,               -- 来源链接（外部公开）
+    source_file TEXT,               -- 内部档案相对路径
+    status      TEXT DEFAULT '现行有效', -- 现行有效/已废止/修订中
+    notes       TEXT
+);
+
 -- ============ 待办 / 附件 ============
 CREATE TABLE IF NOT EXISTS todo (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,

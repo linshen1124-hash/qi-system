@@ -64,6 +64,8 @@ TABLES = {
     "publicity": ["date", "category", "title", "channel", "author", "status", "notes"],
     "subscription": ["year", "name", "copies", "unit_price", "amount", "dept", "notes"],
     "archive_index": ["path", "filename", "domain", "year", "ftype", "size", "source", "notes"],
+    "rule_source": ["name", "doc_no", "issuer", "level", "domain", "year", "url",
+                    "source_file", "status", "notes"],
 }
 
 
