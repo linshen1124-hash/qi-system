@@ -28,6 +28,11 @@ const ICONS = {
   supplier: '<path d="M3 21V9l6 4V9l6 4V9l6 4v8z"/>',
   star: '<path d="M12 3l2.7 5.5 6 .9-4.3 4.2 1 6-5.4-2.8L6.6 19.8l1-6L3.3 9.4l6-.9z"/>',
   gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v9h14v-9"/><line x1="12" y1="8" x2="12" y2="21"/><path d="M12 8S10.5 4 8 4a2 2 0 0 0 0 4z"/><path d="M12 8s1.5-4 4-4a2 2 0 0 1 0 4z"/>',
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><rect x="10" y="14" width="4" height="7"/>',
+  plane: '<path d="M10 3.5 4 12l-1.5-.3L4 8 2 8.5 1 7l3-1.5L10 3.5z" transform="translate(1 4) scale(1.4)"/>',
+  flag: '<path d="M4 21V4"/><path d="M4 4h12l-2 3.5L16 11H4"/>',
+  news: '<path d="M4 5h13v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M17 8h3v11a1 1 0 0 1-1 1"/><line x1="7" y1="9" x2="14" y2="9"/><line x1="7" y1="13" x2="14" y2="13"/><line x1="7" y1="17" x2="11" y2="17"/>',
+  people: '<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 6a3 3 0 0 1 0 6"/><path d="M18 20a6 6 0 0 0-3-5.2"/>',
 };
 function icon(name) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ''}</svg>`;
@@ -270,6 +275,108 @@ const MODULES = {
       F('notes', '备注', { full: 1 }),
     ],
   },
+  housing: {
+    title: '职工住房', table: 'housing', icon: '🏠',
+    columns: [['campus', '院区/地址'], ['room_no', '房间'], ['name', '住户'], ['dept', '部门'], ['area', '面积㎡', 'num'], ['rent_month', '月租', 'num'], ['fee_year', '年缴费', 'money'], ['status', '状态', 'status']],
+    fields: [
+      F('campus', '院区/地址(门楼胡同3号/单身宿舍...)'),
+      F('room_no', '房间号'), F('name', '住户/职工姓名', { req: 1 }), F('dept', '部门'),
+      F('area', '住房面积(㎡)', { type: 'number' }),
+      F('rent_month', '房租(元/月)', { type: 'number' }), F('fee_year', '缴费金额(元/年)', { type: 'number' }),
+      F('relation', '与承租人关系'), F('move_in', '入住日期', { type: 'date' }),
+      F('phone', '联系电话'),
+      F('status', '状态', { type: 'select', options: ['在住', '退租', '欠费'], def: '在住' }),
+      F('notes', '备注', { full: 1 }),
+    ],
+  },
+  visitor: {
+    title: '访客备案', table: 'visitor', icon: '🧾',
+    columns: [['date', '来访日期'], ['name', '访客'], ['org', '所在单位'], ['reason', '事由'], ['host', '被访人'], ['host_dept', '被访部门'], ['phone', '电话']],
+    fields: [
+      F('date', '来访日期', { type: 'date' }), F('name', '访客姓名', { req: 1 }),
+      F('gender', '性别', { type: 'select', options: ['男', '女'] }),
+      F('org', '来访人所在单位'), F('reason', '来访事由'),
+      F('host', '被访人'), F('host_dept', '被访部门'),
+      F('id_no', '证件号码'), F('phone', '联系电话'),
+      F('notes', '备注', { full: 1 }),
+    ],
+  },
+  worker: {
+    title: '工勤人员', table: 'worker', icon: '👷',
+    columns: [['name', '姓名'], ['unit', '单位'], ['phone', '手机号'], ['monthly_pay', '月补助', 'money'], ['status', '状态', 'status']],
+    fields: [
+      F('name', '姓名', { req: 1 }), F('unit', '单位全称'),
+      F('phone', '手机号'), F('id_no', '证件号码'),
+      F('monthly_pay', '月补助/实发', { type: 'number' }), F('bank', '开户行/卡号'),
+      F('status', '状态', { type: 'select', options: ['在岗', '离岗'], def: '在岗' }),
+      F('notes', '备注', { full: 1 }),
+    ],
+    hint: '含证件号、银行卡等敏感信息，请注意本系统当前无登录鉴权，仅限可信内网单机使用。',
+  },
+  overseas: {
+    title: '因私出国(境)', table: 'overseas', icon: '✈️',
+    columns: [['name', '姓名'], ['dept', '部门'], ['country', '国家/地区'], ['reason', '事由'], ['start_date', '出行起'], ['end_date', '出行止'], ['status', '状态', 'status']],
+    fields: [
+      F('name', '姓名', { req: 1 }), F('dept', '部门'),
+      F('country', '国家/地区'), F('reason', '事由', { full: 1 }),
+      F('start_date', '出行起', { type: 'date' }), F('end_date', '出行止', { type: 'date' }),
+      F('status', '状态', { type: 'select', options: ['待审批', '已批准', '已回访'], def: '待审批' }),
+      F('notes', '备注', { full: 1 }),
+    ],
+    attach: 1,
+  },
+  title_eval: {
+    title: '职称评定', table: 'title_eval', icon: '🎖️',
+    columns: [['name', '姓名'], ['dept', '部门'], ['series', '专业/系列'], ['current_title', '现职称'], ['apply_title', '申报职称'], ['year', '年度', 'num'], ['status', '状态', 'status']],
+    fields: [
+      F('name', '姓名', { req: 1 }), F('dept', '部门'),
+      F('series', '专业/系列(工程系列...)'),
+      F('current_title', '现职称'), F('apply_title', '申报职称'),
+      F('year', '年度', { type: 'number', def: new Date().getFullYear() }),
+      F('status', '状态', { type: 'select', options: ['申报', '评审中', '通过', '未通过'], def: '申报' }),
+      F('notes', '备注', { full: 1 }),
+    ],
+    attach: 1,
+  },
+  party: {
+    title: '党群工作', table: 'party', icon: '🚩',
+    columns: [['date', '日期'], ['category', '类别'], ['title', '主题/事项'], ['participants', '参加人'], ['owner', '负责人'], ['status', '状态', 'status']],
+    fields: [
+      F('date', '日期', { type: 'date' }),
+      F('category', '类别', { type: 'select', options: ['理论学习', '主题党日', '组织生活', '入党', '思想汇报', '志愿服务', '其他'] }),
+      F('title', '主题/事项', { req: 1, full: 1 }),
+      F('participants', '参加人/人数'), F('owner', '负责人'),
+      F('status', '状态', { type: 'select', options: ['计划', '进行中', '已完成'], def: '计划' }),
+      F('notes', '备注', { full: 1 }),
+    ],
+    attach: 1,
+  },
+  publicity: {
+    title: '宣传报道', table: 'publicity', icon: '📰',
+    columns: [['date', '日期'], ['category', '类别'], ['title', '标题'], ['channel', '发布渠道'], ['author', '撰稿人'], ['status', '状态', 'status']],
+    fields: [
+      F('date', '日期', { type: 'date' }),
+      F('category', '类别', { type: 'select', options: ['新闻稿', '宣传报道', '院级通知', '简报', '安全检查', '其他'] }),
+      F('title', '标题', { req: 1, full: 1 }),
+      F('channel', '发布渠道', { type: 'select', options: ['院网', '微信', '简报', '部系统', '其他'] }),
+      F('author', '撰稿人'),
+      F('status', '状态', { type: 'select', options: ['拟稿', '已发布'], def: '拟稿' }),
+      F('notes', '内容摘要/备注', { full: 1 }),
+    ],
+    attach: 1,
+  },
+  subscription: {
+    title: '报刊征订', table: 'subscription', icon: '📚',
+    columns: [['year', '年度', 'num'], ['name', '报刊名称'], ['copies', '份数', 'num'], ['unit_price', '单价', 'num'], ['amount', '金额', 'money'], ['dept', '订阅部门']],
+    fields: [
+      F('year', '年度', { type: 'number', def: new Date().getFullYear() }),
+      F('name', '报刊名称', { req: 1, full: 1 }),
+      F('copies', '份数', { type: 'number' }), F('unit_price', '单价', { type: 'number' }),
+      F('amount', '金额(留空自动算)', { type: 'number' }), F('dept', '订阅部门'),
+      F('notes', '备注', { full: 1 }),
+    ],
+    hint: '填了份数与单价、金额留空系统自动计算(份数×单价)。',
+  },
 };
 
 const NAV = [
@@ -278,11 +385,13 @@ const NAV = [
   { group: '资产管理', items: [['asset', '固定资产', 'Assets', 'asset']] },
   { group: '合同供应商', items: [['contract', '合同管理', 'Contracts', 'contract'], ['supplier', '供应商名录', 'Suppliers', 'supplier'], ['supplier_eval', '供应商评价', 'Supplier Eval', 'star'], ['fee_bill', '费用缴纳', 'Fees', 'fee']] },
   { group: '车辆与司机', items: [['trip_record', '行车记录', 'Trip Records', 'trip'], ['subsidy', '司机补助', 'Subsidies', 'subsidy'], ['driver', '司机档案', 'Drivers', 'driver'], ['vehicle', '车辆档案', 'Vehicles', 'vehicle']] },
-  { group: '房产与用房', items: [['room', '用房分配', 'Rooms', 'room'], ['permit', '出入证/车证', 'Permits', 'permit']] },
+  { group: '房产与用房', items: [['room', '用房分配', 'Rooms', 'room'], ['housing', '职工住房', 'Housing', 'home'], ['permit', '出入证/车证', 'Permits', 'permit'], ['visitor', '访客备案', 'Visitors', 'people']] },
   { group: '节能改造', items: [['energy_summary', '能耗汇总', 'Energy Summary', 'energy'], ['energy_reading', '能耗台账', 'Energy Ledger', 'energy'], ['energy_activity', '节能宣传', 'Energy Programs', 'megaphone']] },
-  { group: '工会职工', items: [['staff', '职工花名册', 'Staff', 'driver'], ['welfare', '福利发放', 'Welfare', 'gift']] },
+  { group: '工会职工', items: [['staff', '职工花名册', 'Staff', 'people'], ['welfare', '福利发放', 'Welfare', 'gift']] },
+  { group: '人事管理', items: [['worker', '工勤人员', 'Workers', 'people'], ['overseas', '因私出国', 'Overseas', 'plane'], ['title_eval', '职称评定', 'Titles', 'star']] },
+  { group: '党群宣传', items: [['party', '党群工作', 'Party', 'flag'], ['publicity', '宣传报道', 'Publicity', 'news']] },
   { group: '规章制度', items: [['regulation', '规章制度', 'Regulations', 'book']] },
-  { group: '事务', items: [['todo', '待办事项', 'Tasks', 'todo'], ['settings', '系统设置', 'Settings', 'settings']] },
+  { group: '事务', items: [['subscription', '报刊征订', 'Subscriptions', 'news'], ['todo', '待办事项', 'Tasks', 'todo'], ['settings', '系统设置', 'Settings', 'settings']] },
 ];
 
 /* 页面英文点缀（kicker）与图标 */
@@ -294,6 +403,9 @@ const KICKER = {
   regulation: 'REGULATIONS',
   procurement: 'PROCUREMENT', asset: 'FIXED ASSETS', supplier: 'SUPPLIERS',
   supplier_eval: 'SUPPLIER EVAL', staff: 'STAFF ROSTER', welfare: 'WELFARE',
+  housing: 'STAFF HOUSING', visitor: 'VISITORS', worker: 'SERVICE STAFF',
+  overseas: 'OVERSEAS TRAVEL', title_eval: 'TITLE REVIEW', party: 'PARTY WORK',
+  publicity: 'PUBLICITY', subscription: 'SUBSCRIPTIONS',
 };
 function setTitle(key, cn) {
   const h = $('#page-title');
@@ -349,6 +461,8 @@ async function viewDashboard() {
     ['在岗司机', c.driver, '人', 'driver', 'var(--neon)'], ['在用车辆', c.vehicle, '辆', 'vehicle', 'var(--neon-2)'],
     ['行车记录', c.trip, '条', 'trip', 'var(--orange)'], ['登记用房', c.room, '间', 'room', 'var(--surface-dim)'],
     ['有效证件', c.permit, '个', 'permit', 'var(--neon-2)'], ['在执行合同', c.contract, '份', 'contract', 'var(--warn)'],
+    ['在办采购', c.procurement, '项', 'cart', 'var(--orange)'], ['在用资产', c.asset, '项', 'asset', 'var(--surface-dim)'],
+    ['合格供应商', c.supplier, '家', 'supplier', 'var(--neon-2)'], ['在册职工', c.staff, '人', 'people', 'var(--neon)'],
   ].map(([k, v, u, ic, bg]) =>
     `<div class="card"><div class="k">${k}<span class="badge" style="background:${bg}">${icon(ic)}</span></div>
      <div class="v">${v}<small> ${u}</small></div></div>`).join('');
@@ -381,17 +495,31 @@ async function viewModule(key) {
   const rows = await api.get('/' + m.table);
 
   const head = m.columns.map(([, label, t]) => `<th class="${t === 'num' || t === 'money' ? 'num' : ''}">${label}</th>`).join('') + '<th></th>';
-  const body = rows.length ? rows.map(r => rowHtml(m, r)).join('') :
-    `<tr><td colspan="${m.columns.length + 1}"><div class="empty">暂无数据，点击右上角"新增"开始录入</div></td></tr>`;
+
+  const renderBody = (list) => {
+    view.querySelector('tbody').innerHTML = list.length ? list.map(r => rowHtml(m, r)).join('')
+      : `<tr><td colspan="${m.columns.length + 1}"><div class="empty">${rows.length ? '没有匹配的记录' : '暂无数据，点击右上角“新增”开始录入'}</div></td></tr>`;
+    const cnt = view.querySelector('#row-count'); if (cnt) cnt.textContent = `共 ${list.length} 条`;
+    view.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openForm(key, rows.find(r => r.id == b.dataset.edit)));
+    view.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delRow(key, b.dataset.del));
+  };
 
   view.innerHTML = `
     ${m.hint ? `<div class="hint">${m.hint}</div>` : ''}
+    <div class="toolbar">
+      <input id="tbl-search" placeholder="搜索本页记录…" style="width:240px">
+      <span id="row-count" class="hint" style="margin:0"></span><div class="spacer"></div>
+    </div>
     <div class="panel"><div class="panel-b"><div style="overflow-x:auto">
-      <table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
+      <table><thead><tr>${head}</tr></thead><tbody></tbody></table>
     </div></div></div>`;
 
-  view.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openForm(key, rows.find(r => r.id == b.dataset.edit)));
-  view.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delRow(key, b.dataset.del));
+  renderBody(rows);
+  const search = view.querySelector('#tbl-search');
+  search.oninput = () => {
+    const q = search.value.trim().toLowerCase();
+    renderBody(q ? rows.filter(r => Object.values(r).some(v => String(v ?? '').toLowerCase().includes(q))) : rows);
+  };
 }
 
 function cellHtml(r, col) {

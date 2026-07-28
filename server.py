@@ -53,6 +53,16 @@ TABLES = {
     "supplier_eval": ["year", "contract_name", "counterparty", "owner", "score", "result", "notes"],
     "staff": ["name", "branch", "dept", "title", "phone", "notes"],
     "welfare": ["item", "year", "staff_name", "branch", "signed", "notes"],
+    "housing": ["campus", "room_no", "name", "dept", "area", "rent_month", "fee_year",
+                "relation", "move_in", "phone", "status", "notes"],
+    "visitor": ["date", "name", "gender", "org", "reason", "host", "host_dept",
+                "id_no", "phone", "notes"],
+    "worker": ["name", "unit", "phone", "id_no", "monthly_pay", "bank", "status", "notes"],
+    "overseas": ["name", "dept", "country", "reason", "start_date", "end_date", "status", "notes"],
+    "title_eval": ["name", "dept", "series", "current_title", "apply_title", "year", "status", "notes"],
+    "party": ["date", "category", "title", "participants", "owner", "status", "notes"],
+    "publicity": ["date", "category", "title", "channel", "author", "status", "notes"],
+    "subscription": ["year", "name", "copies", "unit_price", "amount", "dept", "notes"],
 }
 
 
@@ -198,6 +208,10 @@ def get_dashboard():
         "room": db.one("SELECT COUNT(*) c FROM room")["c"],
         "permit": db.one("SELECT COUNT(*) c FROM permit WHERE status='有效'")["c"],
         "contract": db.one("SELECT COUNT(*) c FROM contract WHERE status!='已结束'")["c"],
+        "procurement": db.one("SELECT COUNT(*) c FROM procurement WHERE status!='完成'")["c"],
+        "asset": db.one("SELECT COUNT(*) c FROM asset WHERE status='在用'")["c"],
+        "supplier": db.one("SELECT COUNT(*) c FROM supplier WHERE status='合格'")["c"],
+        "staff": db.one("SELECT COUNT(*) c FROM staff")["c"],
     }
     reminders = get_reminders()
     return {"counts": counts, "reminders": reminders,
@@ -386,6 +400,10 @@ class Handler(BaseHTTPRequestHandler):
             cons, price = num(data.get("consumption")), num(data.get("unit_price"))
             if cons is not None and price is not None and not data.get("amount"):
                 data["amount"] = round(cons * price, 2)
+        elif table == "subscription":
+            cp, up = num(data.get("copies")), num(data.get("unit_price"))
+            if cp is not None and up is not None and not data.get("amount"):
+                data["amount"] = round(cp * up, 2)
 
     def _create(self, table, data):
         self._derive_fields(table, data)

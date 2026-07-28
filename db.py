@@ -276,6 +276,109 @@ CREATE TABLE IF NOT EXISTS welfare (
     notes      TEXT
 );
 
+-- ============ 模块九：房产延伸（职工住房 / 访客备案）============
+CREATE TABLE IF NOT EXISTS housing (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    campus     TEXT,                -- 院区/地址（门楼胡同3号/单身宿舍...）
+    room_no    TEXT,                -- 房间号
+    name       TEXT NOT NULL,       -- 住户/职工姓名
+    dept       TEXT,                -- 部门
+    area       REAL,                -- 住房面积(㎡)
+    rent_month REAL,                -- 房租(元/月)
+    fee_year   REAL,                -- 缴费金额(元/年)
+    relation   TEXT,                -- 现居住人与承租人关系
+    move_in    TEXT,                -- 入住日期
+    phone      TEXT,                -- 联系电话
+    status     TEXT DEFAULT '在住',  -- 在住/退租/欠费
+    notes      TEXT
+);
+
+CREATE TABLE IF NOT EXISTS visitor (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    date      TEXT,                 -- 来访日期
+    name      TEXT NOT NULL,        -- 访客姓名
+    gender    TEXT,                 -- 性别
+    org       TEXT,                 -- 来访人所在单位
+    reason    TEXT,                 -- 来访事由
+    host      TEXT,                 -- 被访人
+    host_dept TEXT,                 -- 被访部门
+    id_no     TEXT,                 -- 证件号码
+    phone     TEXT,                 -- 联系电话
+    notes     TEXT
+);
+
+-- ============ 模块十：人事管理（工勤人员 / 因私出国 / 职称评定）============
+CREATE TABLE IF NOT EXISTS worker (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,      -- 姓名
+    unit        TEXT,               -- 单位全称
+    phone       TEXT,               -- 手机号
+    id_no       TEXT,               -- 证件号码
+    monthly_pay REAL,               -- 月补助/实发
+    bank        TEXT,               -- 开户行/卡号
+    status      TEXT DEFAULT '在岗', -- 在岗/离岗
+    notes       TEXT
+);
+
+CREATE TABLE IF NOT EXISTS overseas (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL,       -- 姓名
+    dept       TEXT,                -- 部门
+    country    TEXT,                -- 国家/地区
+    reason     TEXT,                -- 事由
+    start_date TEXT,                -- 出行起
+    end_date   TEXT,                -- 出行止
+    status     TEXT DEFAULT '待审批', -- 待审批/已批准/已回访
+    notes      TEXT
+);
+
+CREATE TABLE IF NOT EXISTS title_eval (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL,    -- 姓名
+    dept          TEXT,             -- 部门
+    series        TEXT,             -- 专业/系列（工程系列...）
+    current_title TEXT,             -- 现职称
+    apply_title   TEXT,             -- 申报职称
+    year          INTEGER,          -- 年度
+    status        TEXT DEFAULT '申报', -- 申报/评审中/通过/未通过
+    notes         TEXT
+);
+
+-- ============ 模块十一：党群宣传 ============
+CREATE TABLE IF NOT EXISTS party (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    date         TEXT,              -- 日期
+    category     TEXT,              -- 理论学习/主题党日/组织生活/入党/思想汇报/志愿服务
+    title        TEXT NOT NULL,     -- 主题/事项
+    participants TEXT,              -- 参加人/人数
+    owner        TEXT,              -- 负责人
+    status       TEXT DEFAULT '计划', -- 计划/进行中/已完成
+    notes        TEXT
+);
+
+CREATE TABLE IF NOT EXISTS publicity (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    date     TEXT,                  -- 日期
+    category TEXT,                  -- 新闻稿/宣传报道/院级通知/简报/安全检查
+    title    TEXT NOT NULL,         -- 标题
+    channel  TEXT,                  -- 发布渠道（院网/微信/简报）
+    author   TEXT,                  -- 撰稿人
+    status   TEXT DEFAULT '拟稿',    -- 拟稿/已发布
+    notes    TEXT
+);
+
+-- ============ 模块十二：报刊征订 ============
+CREATE TABLE IF NOT EXISTS subscription (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    year       INTEGER,             -- 年度
+    name       TEXT NOT NULL,       -- 报刊名称
+    copies     INTEGER,             -- 份数
+    unit_price REAL,                -- 单价
+    amount     REAL,                -- 金额（可自动=份数×单价）
+    dept       TEXT,                -- 订阅部门
+    notes      TEXT
+);
+
 -- ============ 待办 / 附件 ============
 CREATE TABLE IF NOT EXISTS todo (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
