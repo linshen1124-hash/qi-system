@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QI SYSTEM · 测试页面</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="app">
+  <aside class="sidebar">
+    <div class="brand"><b>QI SYSTEM</b><small>后勤管理处 · LOGISTICS OPS</small></div>
+    <div class="sidebar-foot">v0.1 · 内网单机</div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <h1 data-kicker="OVERVIEW">工作台</h1>
+      <div id="topbar-actions">
+        <button class="btn primary">新增</button>
+        <button class="btn">导出</button>
+      </div>
+    </header>
+    <section id="view">
+      <!-- 统计卡片 -->
+      <div class="cards">
+        <div class="card"><div class="k">在岗司机</div><div class="v">12<small> 人</small></div></div>
+        <div class="card"><div class="k">在用车辆</div><div class="v">8<small> 辆</small></div></div>
+        <div class="card"><div class="k">行车记录</div><div class="v">3,240<small> 条</small></div></div>
+        <div class="card"><div class="k">有效合同</div><div class="v">56<small> 份</small></div></div>
+      </div>
+
+      <!-- 表格面板 -->
+      <div class="panel">
+        <div class="panel-h"><h2>车辆档案</h2></div>
+        <div class="panel-b" style="overflow-x:auto">
+          <table>
+            <thead><tr><th>车牌号</th><th>车型</th><th class="num">公里数</th><th>状态</th><th></th></tr></thead>
+            <tbody>
+              <tr><td>京A·12345</td><td>奥迪A6L</td><td class="num">156,230</td><td><span class="tag ok">在用</span></td><td style="text-align:right"><button class="btn link">编辑</button><button class="btn link danger">删除</button></td></tr>
+              <tr><td>京B·67890</td><td>帕萨特</td><td class="num">89,450</td><td><span class="tag ok">在用</span></td><td style="text-align:right"><button class="btn link">编辑</button><button class="btn link danger">删除</button></td></tr>
+              <tr><td>京C·11223</td><td>别克GL8</td><td class="num">203,100</td><td><span class="tag warn">维修中</span></td><td style="text-align:right"><button class="btn link">编辑</button><button class="btn link danger">删除</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 提醒面板 -->
+      <div class="panel accent">
+        <div class="panel-h"><h2>到期与待办提醒</h2></div>
+        <div class="panel-b">
+          <div class="remind overdue">
+            <div><div class="r-title">车辆保险 · 京A·12345</div><div class="r-kind">合同到期</div></div>
+            <div class="r-meta">2026-06-15<br><span class="tag danger">逾期43天</span></div>
+          </div>
+          <div class="remind">
+            <div><div class="r-title">物业费 · 万寿路27号院</div><div class="r-kind">费用待缴</div></div>
+            <div class="r-meta">2026-08-01<br>剩 4 天</div>
+          </div>
+          <div class="remind">
+            <div><div class="r-title">驾驶员体检 · 王师傅</div><div class="r-kind">待办</div></div>
+            <div class="r-meta">2026-08-15<br>剩 18 天</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 表单面板 -->
+      <div class="panel" style="max-width:560px">
+        <div class="panel-h"><h2>新增车辆</h2></div>
+        <div class="panel-b" style="padding:18px 20px">
+          <div class="form-grid">
+            <div class="field"><label>车牌号 *</label><input value=""></div>
+            <div class="field"><label>车型</label><input value=""></div>
+            <div class="field"><label>车辆类型</label>
+              <select><option></option><option>小型普通客车</option><option>小型轿车</option><option>大型客车</option></select>
+            </div>
+            <div class="field"><label>注册日期</label><input type="date"></div>
+            <div class="field full"><label>备注</label><input></div>
+          </div>
+        </div>
+        <div class="modal-f"><button class="btn">取消</button><button class="btn primary">保存</button></div>
+      </div>
+
+      <p class="hint">服务正常 · 数据文件 <code>data/qi.db</code> · 附件目录 <code>uploads/</code></p>
+    </section>
+  </main>
+</div>
+</body>
+</html>

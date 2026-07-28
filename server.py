@@ -21,7 +21,11 @@ UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 # 允许通用增删改查的表 -> 可写列
 TABLES = {
     "driver":   ["name", "phone", "active", "notes"],
-    "vehicle":  ["plate", "model", "active", "notes"],
+    "vehicle":  ["plate", "model", "vehicle_type", "owner_name", "owner_address",
+                 "use_nature", "vin", "engine_no", "registration_date", "issue_date",
+                 "seating_capacity", "gross_mass", "curb_weight", "rated_load",
+                 "dimensions", "fuel_type", "displacement", "inspection_expire",
+                 "retirement_date", "active", "notes"],
     "trip_record": ["date", "driver_id", "vehicle_id", "dept", "route",
                     "start_km", "end_km", "km", "passenger", "overtime_h", "notes"],
     "subsidy_month": ["driver_id", "year", "month", "total_km", "km_rate",
@@ -34,9 +38,21 @@ TABLES = {
     "fee_bill": ["contract_id", "category", "period", "amount", "due_date",
                  "paid", "paid_date", "notes"],
     "todo":     ["title", "due_date", "done", "module", "notes"],
+    "regulation": ["title", "document_no", "category", "issue_date",
+                   "dept", "status", "notes"],
     "energy_reading": ["period", "energy_type", "campus", "prev_reading", "curr_reading",
                        "consumption", "unit", "unit_price", "amount", "notes"],
     "energy_activity": ["date", "category", "title", "org", "contact", "status", "notes"],
+    "procurement": ["year_batch", "name", "category", "dept", "tech_req", "biz_req",
+                    "qty", "unit", "budget", "method", "supplier", "amount", "owner",
+                    "status", "apply_date", "notes"],
+    "asset": ["asset_no", "name", "spec", "orig_value", "keeper", "location",
+              "supplier", "buy_date", "status", "notes"],
+    "supplier": ["name", "category", "credit_no", "contact", "phone",
+                 "enroll_date", "status", "notes"],
+    "supplier_eval": ["year", "contract_name", "counterparty", "owner", "score", "result", "notes"],
+    "staff": ["name", "branch", "dept", "title", "phone", "notes"],
+    "welfare": ["item", "year", "staff_name", "branch", "signed", "notes"],
 }
 
 
@@ -128,6 +144,42 @@ def get_reminders():
     return items
 
 
+def auto_sync_todos():
+    """扫描车辆年检/报废、证件到期、合同到期、缴费到期，
+    对30天内到期且尚无待办的记录自动创建一条待办。"""
+    days = int(db.get_setting("remind_days", 30))
+    today = date.today()
+    horizon = (today + timedelta(days=days)).isoformat()
+    created = 0
+    # 定义要检查的规则: (表, 日期字段, module_key, 标题模板)
+    rules = [
+        ("vehicle", "inspection_expire", "inspection", "车辆年检到期：{title}",
+         "SELECT v.*, v.plate||'' as title FROM vehicle v WHERE v.active=1 AND v.inspection_expire IS NOT NULL AND v.inspection_expire!='' AND v.inspection_expire<=?"),
+        ("vehicle", "retirement_date", "retire", "车辆报废到期：{title}",
+         "SELECT v.*, v.plate||'' as title FROM vehicle v WHERE v.active=1 AND v.retirement_date IS NOT NULL AND v.retirement_date!='' AND v.retirement_date<=?"),
+        ("permit", "expire_date", "permit_expire", "证件到期：{title}",
+         "SELECT p.*, (p.holder||' '||p.permit_no||'') as title FROM permit p WHERE p.status='有效' AND p.expire_date IS NOT NULL AND p.expire_date!='' AND p.expire_date<=?"),
+        ("contract", "end_date", "contract_end", "合同到期：{title}",
+         "SELECT c.*, c.name||'' as title FROM contract c WHERE c.status!='已结束' AND c.end_date IS NOT NULL AND c.end_date!='' AND c.end_date<=?"),
+        ("contract", "next_pay", "contract_pay", "合同缴费：{title}",
+         "SELECT c.*, c.name||'' as title FROM contract c WHERE c.next_pay IS NOT NULL AND c.next_pay!='' AND c.next_pay<=?"),
+        ("fee_bill", "due_date", "fee_bill", "费用待缴：{title}",
+         "SELECT f.*, (f.category||' '||f.period||'') as title FROM fee_bill f WHERE f.paid=0 AND f.due_date IS NOT NULL AND f.due_date!='' AND f.due_date<=?"),
+    ]
+    for table, date_field, tag, title_tmpl, sql in rules:
+        for row in db.rows(sql, (horizon,)):
+            # 唯一标识：auto:<table>:<id>:<tag>
+            ref = f"auto:{table}:{row['id']}:{tag}"
+            exist = db.one("SELECT id FROM todo WHERE module=? AND done=0", (ref,))
+            if not exist:
+                t = title_tmpl.format(title=row.get("title") or row.get("name") or "")
+                db.run(
+                    "INSERT INTO todo(title, due_date, done, module, notes) VALUES(?,?,0,?,?)",
+                    (t, row[date_field], ref, f"系统自动创建，来自{table}表"))
+                created += 1
+    return created
+
+
 def _remind_item(kind, title, d, today, entity, eid):
     try:
         left = (datetime.strptime(d, "%Y-%m-%d").date() - date.fromisoformat(today)).days
@@ -138,6 +190,7 @@ def _remind_item(kind, title, d, today, entity, eid):
 
 
 def get_dashboard():
+    auto_sync_todos()
     counts = {
         "driver": db.one("SELECT COUNT(*) c FROM driver WHERE active=1")["c"],
         "vehicle": db.one("SELECT COUNT(*) c FROM vehicle WHERE active=1")["c"],

@@ -47,11 +47,28 @@ CREATE TABLE IF NOT EXISTS driver (
 );
 
 CREATE TABLE IF NOT EXISTS vehicle (
-    id      INTEGER PRIMARY KEY AUTOINCREMENT,
-    plate   TEXT NOT NULL,          -- 车牌号
-    model   TEXT,                   -- 车型
-    active  INTEGER DEFAULT 1,
-    notes   TEXT
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    plate              TEXT NOT NULL,       -- 号牌号码
+    model              TEXT,                -- 品牌型号
+    vehicle_type       TEXT,                -- 车辆类型
+    owner_name         TEXT,                -- 所有人
+    owner_address      TEXT,                -- 住址
+    use_nature         TEXT,                -- 使用性质
+    vin                TEXT,                -- 车辆识别代号
+    engine_no          TEXT,                -- 发动机号码
+    registration_date  TEXT,                -- 注册日期
+    issue_date         TEXT,                -- 发证日期
+    seating_capacity   INTEGER,             -- 核定载人数
+    gross_mass         REAL,                -- 总质量(kg)
+    curb_weight        REAL,                -- 整备质量(kg)
+    rated_load         REAL,                -- 核定载质量(kg)
+    dimensions         TEXT,                -- 外廓尺寸
+    fuel_type          TEXT,                -- 燃料种类
+    displacement       TEXT,                -- 排量/功率
+    inspection_expire  TEXT,                -- 检验有效期至
+    retirement_date    TEXT,                -- 强制报废期止
+    active             INTEGER DEFAULT 1,
+    notes              TEXT
 );
 
 CREATE TABLE IF NOT EXISTS trip_record (
@@ -165,6 +182,100 @@ CREATE TABLE IF NOT EXISTS energy_activity (
     notes    TEXT
 );
 
+-- ============ 规章制度 ============
+CREATE TABLE IF NOT EXISTS regulation (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    title        TEXT NOT NULL,           -- 标题
+    document_no  TEXT,                    -- 文号
+    category     TEXT,                    -- 类别
+    issue_date   TEXT,                    -- 发布日期
+    dept         TEXT,                    -- 发布部门
+    status       TEXT DEFAULT '现行有效', -- 现行有效/已废止/已修订
+    notes        TEXT,
+    created      TEXT DEFAULT (datetime('now','localtime'))
+);
+
+-- ============ 模块五：采购管理 ============
+CREATE TABLE IF NOT EXISTS procurement (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    year_batch TEXT,                 -- 年度/批次（如 2025年第一批）
+    name       TEXT NOT NULL,        -- 项目名称
+    category   TEXT,                 -- 服务/货物/工程
+    dept       TEXT,                 -- 需求部门
+    tech_req   TEXT,                 -- 技术要求
+    biz_req    TEXT,                 -- 商务要求
+    qty        REAL,                 -- 数量
+    unit       TEXT,                 -- 单位
+    budget     REAL,                 -- 预算（万元）
+    method     TEXT,                 -- 采购方式：政府集中/院自主/单一来源/竞争性谈判/询价
+    supplier   TEXT,                 -- 成交供应商
+    amount     REAL,                 -- 成交金额（万元）
+    owner      TEXT,                 -- 承办人
+    status     TEXT DEFAULT '申报',  -- 申报/立项/招标中/已定标/验收/完成
+    apply_date TEXT,                 -- 申报日期
+    notes      TEXT
+);
+
+-- ============ 模块六：固定资产 ============
+CREATE TABLE IF NOT EXISTS asset (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_no   TEXT,                 -- 资产编号
+    name       TEXT NOT NULL,        -- 设备名称
+    spec       TEXT,                 -- 规格型号
+    orig_value REAL,                 -- 设备原值
+    keeper     TEXT,                 -- 保管人
+    location   TEXT,                 -- 使用地点/部门
+    supplier   TEXT,                 -- 供应商
+    buy_date   TEXT,                 -- 购置日期
+    status     TEXT DEFAULT '在用',  -- 在用/闲置/报废/盘亏
+    notes      TEXT
+);
+
+-- ============ 模块七：供应商管理 ============
+CREATE TABLE IF NOT EXISTS supplier (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,       -- 供应商名称
+    category    TEXT,                -- 保洁/绿化/餐饮/维修/办公用品/工程/其他
+    credit_no   TEXT,                -- 统一社会信用代码
+    contact     TEXT,                -- 联系人
+    phone       TEXT,                -- 电话
+    enroll_date TEXT,                -- 入库日期
+    status      TEXT DEFAULT '合格',  -- 合格/暂停/退出
+    notes       TEXT
+);
+
+CREATE TABLE IF NOT EXISTS supplier_eval (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    year          INTEGER,           -- 评价年度
+    contract_name TEXT,              -- 合同内容
+    counterparty  TEXT,              -- 合同乙方/供应商
+    owner         TEXT,              -- 承办人
+    score         REAL,              -- 评分
+    result        TEXT,              -- 优秀/合格/不合格
+    notes         TEXT
+);
+
+-- ============ 模块八：工会与职工 ============
+CREATE TABLE IF NOT EXISTS staff (
+    id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    name   TEXT NOT NULL,            -- 姓名
+    branch TEXT,                     -- 分会（如 第十一分工会）
+    dept   TEXT,                     -- 部门
+    title  TEXT,                     -- 岗位/职务
+    phone  TEXT,                     -- 联系电话
+    notes  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS welfare (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    item       TEXT NOT NULL,        -- 福利项目（春节福利/三八节伴手礼/端午...）
+    year       INTEGER,              -- 年度
+    staff_name TEXT,                 -- 职工姓名
+    branch     TEXT,                 -- 分会
+    signed     INTEGER DEFAULT 0,    -- 是否签领
+    notes      TEXT
+);
+
 -- ============ 待办 / 附件 ============
 CREATE TABLE IF NOT EXISTS todo (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -201,6 +312,36 @@ def init_db():
     conn.executescript(SCHEMA)
     for k, v in DEFAULT_SETTINGS.items():
         conn.execute("INSERT OR IGNORE INTO setting(key,value) VALUES(?,?)", (k, v))
+    conn.commit()
+    _migrate()
+
+
+def _migrate():
+    """增量迁移：对已有数据库添加新列（已有列自动跳过）。"""
+    conn = get_conn()
+    existing = {r[1] for r in conn.execute("PRAGMA table_info(vehicle)")}
+    cols = [
+        ("vehicle_type",       "TEXT"),
+        ("owner_name",         "TEXT"),
+        ("owner_address",      "TEXT"),
+        ("use_nature",         "TEXT"),
+        ("vin",                "TEXT"),
+        ("engine_no",          "TEXT"),
+        ("registration_date",  "TEXT"),
+        ("issue_date",         "TEXT"),
+        ("seating_capacity",   "INTEGER"),
+        ("gross_mass",         "REAL"),
+        ("curb_weight",        "REAL"),
+        ("rated_load",         "REAL"),
+        ("dimensions",         "TEXT"),
+        ("fuel_type",          "TEXT"),
+        ("displacement",       "TEXT"),
+        ("inspection_expire",  "TEXT"),
+        ("retirement_date",    "TEXT"),
+    ]
+    for name, typ in cols:
+        if name not in existing:
+            conn.execute(f"ALTER TABLE vehicle ADD COLUMN {name} {typ}")
     conn.commit()
 
 
