@@ -641,7 +641,7 @@ AS $$
                COALESCE(sm.other_amount, 0) AS other_amount,
                COALESCE(sm.other_note, '') AS other_note,
                COALESCE(sm.locked, false) AS locked,
-               sm.id,
+               sm.id AS subsidy_id,
                p_year AS year, p_month AS month
         FROM driver d
         LEFT JOIN subsidy_month sm ON d.id = sm.driver_id
@@ -655,7 +655,7 @@ AS $$
         dd.overtime_h, dd.overtime_rate, ROUND((dd.overtime_h * dd.overtime_rate)::numeric, 2) AS overtime_amount,
         dd.other_amount, dd.other_note,
         ROUND((dd.total_km * dd.km_rate + dd.overtime_h * dd.overtime_rate + dd.other_amount)::numeric, 2) AS total_amount,
-        dd.locked, dd.id
+        dd.locked, dd.subsidy_id AS id
     FROM driver_data dd;
 $$;
 
