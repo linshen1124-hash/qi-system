@@ -119,8 +119,24 @@ AS $$
     SELECT round(p_monthly * 12, 2);
 $$;
 
--- ---------- 6. 台账体检 ----------
--- 对照本规则逐户核算，标出与台账不符的记录，供人工复核（只读，不改数据）
+-- ---------- 6. 院内执行单价 ----------
+-- 文件推导的非成套单价为 2.2875。院内沿用历史做法取整为 2.30 执行，
+-- 差 0.0125 元/㎡/月（0.55%）。以执行单价为准，存在 setting 表便于日后调整。
+CREATE OR REPLACE FUNCTION housing_applied_rate()
+RETURNS numeric
+LANGUAGE sql STABLE
+AS $$
+    SELECT COALESCE(
+        (SELECT value::numeric FROM setting WHERE key = 'housing_unit_rate'),
+        2.30
+    );
+$$;
+
+COMMENT ON FUNCTION housing_applied_rate IS
+    '院内实际执行的非成套住房租金单价（默认 2.30，取整自文件推导值 2.2875），改值改 setting.housing_unit_rate';
+
+-- ---------- 7. 台账体检 ----------
+-- 逐户核算，标出与执行口径不符的记录，供人工复核（只读，不改数据）
 CREATE OR REPLACE FUNCTION housing_rent_review()
 RETURNS TABLE (
     id            bigint,
@@ -130,8 +146,8 @@ RETURNS TABLE (
     rent_month    double precision,
     fee_year      double precision,
     implied_rate  numeric,      -- 由台账反推的实际单价
-    cap           numeric,      -- 本规则上限（非成套 2.2875）
-    over_cap      boolean,      -- 实际单价是否超过上限
+    applied_rate  numeric,      -- 院内执行单价（2.30）
+    rate_off      boolean,      -- 反推单价是否偏离执行单价（容差 0.01，吸收面积取整抖动）
     fee_expected  numeric,      -- 按台账月租推算的年缴费
     fee_mismatch  boolean       -- 台账年缴费是否与月租×12 不符
 )
@@ -139,9 +155,9 @@ LANGUAGE sql STABLE
 AS $$
     SELECT h.id, h.campus, h.name, h.area, h.rent_month, h.fee_year,
            CASE WHEN h.area > 0 THEN round((h.rent_month / h.area)::numeric, 4) END,
-           housing_rate_cap(false),
+           housing_applied_rate(),
            CASE WHEN h.area > 0
-                THEN round((h.rent_month / h.area)::numeric, 4) > housing_rate_cap(false) END,
+                THEN abs(round((h.rent_month / h.area)::numeric, 4) - housing_applied_rate()) > 0.01 END,
            housing_fee_year(h.rent_month::numeric),
            CASE WHEN h.fee_year IS NOT NULL AND h.rent_month IS NOT NULL
                 THEN abs(h.fee_year::numeric - round(h.rent_month::numeric * 12, 2)) > 0.01 END
@@ -150,9 +166,10 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION housing_rent_review IS
-    '按 [2000]京房改办字第132号 逐户体检住房台账，标出单价超上限、年缴费与月租不符的记录';
+    '逐户体检住房台账：反推单价是否偏离院内执行单价 2.30、年缴费是否等于月租×12';
 
 -- 新建的函数需要授权给登录用户（rls.sql 只覆盖已存在的对象）
 GRANT EXECUTE ON FUNCTION housing_rate_cap, housing_rent_coef, housing_unit_rate,
-                          housing_monthly_rent, housing_fee_year, housing_rent_review
+                          housing_monthly_rent, housing_fee_year,
+                          housing_applied_rate, housing_rent_review
       TO authenticated, service_role;

@@ -263,9 +263,10 @@ def main():
                 print("\n[预演] 未写入。确认无误后加 --yes 执行。")
                 return
             rows, _ = call("POST", f"/{table}", sets, {"Prefer": "return=representation"})
-            new_id = rows[0]["id"] if rows else None
+            # setting 表主键是 key，没有 id 列——取不到就传 NULL，别让留痕这一步崩掉
+            new_id = rows[0].get("id") if rows else None
             audit("create", table, new_id, "; ".join(f"{k}={v}" for k, v in sets.items()))
-            print(f"\n已新增 id={new_id}，并记入 audit_log。")
+            print(f"\n已新增{f' id={new_id}' if new_id else ''}，并记入 audit_log。")
         return
 
     die(f"未知命令: {cmd}\n用 qi.py --help 看用法")
