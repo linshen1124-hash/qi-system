@@ -21,6 +21,10 @@
 2. 用任意静态服务器打开 `static/` 目录即可（VS Code Live Server / `npx serve static/`）
 3. 改完 push 到 main，Cloudflare 自动部署
 
+⚠️ **改了 `app.js` 或 `style.css`，必须把 `index.html` 里的 `?v=` 版本号 +1。**
+`_headers` 给 js/css 设了 `max-age=86400`，不换 URL 的话 CDN 会继续发一整天旧文件——
+而 html 是 `no-cache` 会立刻更新，两边错配会让线上直接白屏。
+
 需要改数据库结构时，去 Supabase SQL Editor 执行 SQL。**新建表之后务必重跑 `supabase/rls.sql`**，
 否则那张新表对未登录用户是敞开的。
 
