@@ -702,6 +702,13 @@ async function viewProperty() {
       </tbody></table>`;
   };
 
+  // 三类权证各给一个固定颜色，扫一眼就能分清老房权证 / 新不动产证 / 土地证
+  const CERT_TAG = {
+    '房屋所有权证': 'ct-house',
+    '不动产权证': 'ct-realty',
+    '国有土地使用证': 'ct-land',
+  };
+
   const certRow = (c) => {
     const list = under(c.id);
     const isLand = c.cert_type === '国有土地使用证';
@@ -713,7 +720,7 @@ async function viewProperty() {
           <h2 style="font-size:15px">
             <span class="ic">${icon('book')}</span>
             ${esc(c.cert_no)}
-            <span class="tag ${isLand ? 'accent' : ''}">${esc(c.cert_type || '')}</span>
+            <span class="tag ${CERT_TAG[c.cert_type] || ''}">${esc(c.cert_type || '')}</span>
             ${c.status && c.status !== '现行有效' ? `<span class="tag warn">${esc(c.status)}</span>` : ''}
           </h2>
           <div style="display:flex;gap:14px;align-items:center;font-size:12.5px">
@@ -753,7 +760,13 @@ async function viewProperty() {
       <div class="mini-card"><div class="mk-k">实际建筑面积</div><div class="mk-v">${n2(Math.round(totalActual))}<small> ㎡</small></div></div>
       <div class="mini-card"><div class="mk-k">未登记面积</div><div class="mk-v">${n2(Math.round(totalActual - totalCert))}<small> ㎡</small></div></div>
     </div>
-    <div class="hint">点击证号展开该证名下各幢。证载面积应等于名下各幢证载之和；实际面积超出部分即未办证登记的建筑。</div>
+    <div class="hint">点击证号展开该证名下各幢。证载面积应等于名下各幢证载之和；实际面积超出部分即未办证登记的建筑。
+      <span class="cert-legend">
+        <span class="tag ct-house">房屋所有权证</span>
+        <span class="tag ct-realty">不动产权证</span>
+        <span class="tag ct-land">国有土地使用证</span>
+      </span>
+    </div>
     ${(certs || []).map(certRow).join('')}
     ${orphans.length ? `
       <div class="panel" style="margin-bottom:14px">

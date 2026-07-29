@@ -274,3 +274,10 @@ table.sub td{padding:8px 12px;border-bottom:1px solid rgba(22,28,39,.1);white-sp
 table.sub tbody tr:hover{background:var(--surface-dim)}
 .tag.ok{background:var(--neon);color:var(--ink)}
 .tag.warn{background:var(--warn);color:#fff}
+
+/* 三类权证的固定配色：老房权证=紫 / 新不动产证=荧光绿 / 土地证=橙 */
+.tag.ct-house {background:var(--purple-deep);color:#fff}
+.tag.ct-realty{background:var(--neon);color:var(--ink)}
+.tag.ct-land  {background:var(--orange);color:var(--ink)}
+.cert-legend{display:inline-flex;gap:8px;margin-left:14px;vertical-align:middle}
+.cert-legend .tag{font-size:11px;padding:2px 9px}
