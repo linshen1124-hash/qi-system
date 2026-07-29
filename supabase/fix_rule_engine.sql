@@ -11,7 +11,10 @@
 --   2) periodic 分支：`v_today.year` / `v_today.month`
 --      date 类型不支持字段选择语法，运行时报错
 --
---   3) 两处错误都落进 `EXCEPTION WHEN OTHERS THEN CONTINUE`，
+--   3) 循环变量 `r record` 传给 upsert_obligation(p_rule rule) 时报
+--      cannot cast type record to rule —— 需声明为 rule%ROWTYPE
+--
+--   4) 以上错误全部落进 `EXCEPTION WHEN OTHERS THEN CONTINUE`，
 --      于是每条规则都失败、整体却"成功"返回——最难查的那种坏法。
 --
 -- 本次修复：
@@ -28,7 +31,9 @@ RETURNS void
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    r          record;
+    -- 必须是 rule%ROWTYPE 而不是 record：upsert_obligation 的第二个参数类型是 rule
+    -- （表的复合类型），传 record 会报 cannot cast type record to rule
+    r          rule%ROWTYPE;
     rec        record;
     v_today    date := CURRENT_DATE;
     v_horizon  date;
