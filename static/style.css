@@ -232,3 +232,27 @@ td.actions{white-space:nowrap;text-align:right;position:sticky;right:0;
 tbody tr:nth-child(even) td.actions{background:#f2f4fa}
 tbody tr:hover td.actions{background:var(--surface-dim)}
 thead th:last-child{position:sticky;right:0;background:var(--purple-deep);border-left:2px solid var(--ink)}
+
+/* ============ 登录闸门 ============ */
+#auth-gate{position:fixed;inset:0;z-index:200;display:grid;place-items:center;
+  padding:24px;background:var(--orange)}
+#auth-gate[hidden]{display:none}
+.auth-card{width:100%;max-width:380px;background:var(--paper);border:var(--bd);border-radius:var(--r);
+  box-shadow:var(--hard-lg);padding:26px 24px;display:flex;flex-direction:column;gap:16px}
+.auth-brand{margin-bottom:2px}
+.auth-brand b{font-family:var(--font-display);font-size:32px;letter-spacing:1px;display:block;line-height:1}
+.auth-brand small{display:block;margin-top:6px;color:var(--muted);font-size:11px;
+  letter-spacing:.5px;font-weight:600}
+.auth-field{display:flex;flex-direction:column;gap:6px}
+.auth-field label{font-size:12.5px;font-weight:600}
+.auth-field input{padding:10px 12px;border:var(--bd);border-radius:10px;
+  font-family:var(--font-body);font-size:14px;color:var(--ink);background:var(--paper)}
+.auth-field input:focus{outline:none;box-shadow:var(--hard-sm)}
+.auth-err{margin:0;padding:9px 12px;border:2px solid var(--danger);border-radius:10px;
+  background:rgba(229,72,77,.1);color:var(--danger);font-size:12.5px;font-weight:600}
+.auth-err[hidden]{display:none}
+.auth-card .btn{justify-content:center}
+.sidebar-foot .who{color:rgba(255,255,255,.8);font-weight:600;margin-bottom:6px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar-foot .btn.link{color:rgba(255,255,255,.75);font-size:11px;padding:0}
+.sidebar-foot .btn.link:hover{color:#fff}

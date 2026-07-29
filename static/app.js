@@ -4,6 +4,11 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const sb = supabase.createClient(SB_URL, SB_KEY);
 const STORAGE_BUCKET = 'attachments';
 
+/* 当前登录用户。anon key 是公开的，真正拦住外人的是数据库的 RLS 策略——
+   前端这道闸门只负责拿到 authenticated 身份，别把它当安全边界。 */
+let currentUser = null;
+const actorName = () => currentUser?.email || 'unknown';
+
 /* ---------- UI 基础 ---------- */
 const $ = (s, r = document) => r.querySelector(s);
 const el = (h) => { const t = document.createElement('template'); t.innerHTML = h.trim(); return t.content.firstChild; };
@@ -916,12 +921,16 @@ async function fieldHtml(f, row) {
 /* ---------- 附件（Supabase Storage） ---------- */
 async function renderAttach(box, entity, id) {
   const list = await api.get(`/attachment?entity=${entity}&id=${id}`);
-  const rows = (list || []).map(a => {
-    const url = sb.storage.from(STORAGE_BUCKET).getPublicUrl(a.stored_name).data.publicUrl;
-    return `<div class="att-row">📎 <a href="${url}" target="_blank">${esc(a.filename)}</a>
+  // 桶已私有化：用一小时有效的签名链接取代永久公开 URL
+  const rows = (await Promise.all((list || []).map(async a => {
+    const { data: signed } = await sb.storage.from(STORAGE_BUCKET).createSignedUrl(a.stored_name, 3600);
+    const link = signed?.signedUrl
+      ? `<a href="${esc(signed.signedUrl)}" target="_blank" rel="noopener">${esc(a.filename)}</a>`
+      : `<span title="链接生成失败，刷新重试">${esc(a.filename)}</span>`;
+    return `<div class="att-row">📎 ${link}
       <span style="color:var(--muted)">${(a.size / 1024).toFixed(0)}KB</span>
       <button class="btn link danger sm" data-datt="${a.id}" style="margin-left:auto">删除</button></div>`;
-  }).join('');
+  }))).join('');
   box.innerHTML = `<div class="att-list">${rows || '<span style="color:var(--muted);font-size:12px">暂无附件</span>'}</div>
     <div style="margin-top:8px"><input type="file" id="att-file"></div>`;
   box.querySelectorAll('[data-datt]').forEach(b => b.onclick = async () => { await api.del('/attachment/' + b.dataset.datt); renderAttach(box, entity, id); });
@@ -1078,7 +1087,7 @@ async function viewObligations() {
       </table></div></div></div>`;
     view.querySelectorAll('[data-done]').forEach(b => b.onclick = async () => {
       if (!confirm('确认该义务已完成并留痕？')) return;
-      await sb.rpc('close_obligation', { p_id: parseInt(b.dataset.done), p_actor: 'user' });
+      await sb.rpc('close_obligation', { p_id: parseInt(b.dataset.done), p_actor: actorName() });
       toast('已标记完成'); render();
     });
   };
@@ -1129,5 +1138,63 @@ async function viewSettings() {
   };
 }
 
+/* ---------- 登录闸门（Supabase Auth） ---------- */
+const AUTH_ERR_MAP = {
+  'Invalid login credentials': '账号或密码不对',
+  'Email not confirmed': '该账号尚未在 Supabase 中确认邮箱',
+  'Failed to fetch': '连不上服务器，检查网络后重试',
+};
+const authErrMsg = (e) => AUTH_ERR_MAP[e?.message] || e?.message || '登录失败，请重试';
+
+// 区分"自己点了退出"和"登录态被动失效"，两种情况提示不该一样
+let signingOut = false;
+
+function showGate(msg) {
+  $('#app').hidden = true;
+  $('#auth-gate').hidden = false;
+  const err = $('#auth-err');
+  if (msg) { err.textContent = msg; err.hidden = false; } else { err.hidden = true; }
+  $('#auth-email').focus();
+}
+
+function startApp() {
+  $('#auth-gate').hidden = true;
+  $('#app').hidden = false;
+  const email = currentUser?.email || '';
+  $('#sidebar-foot').innerHTML = `<div class="who" title="${esc(email)}">${esc(email)}</div>
+    <button class="btn link" id="signout" type="button">退出登录</button>`;
+  $('#signout').onclick = async () => { signingOut = true; await sb.auth.signOut(); };
+  route();
+}
+
+async function boot() {
+  $('#auth-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = $('#auth-submit');
+    btn.disabled = true; btn.textContent = '登录中…';
+    const { data, error } = await sb.auth.signInWithPassword({
+      email: $('#auth-email').value.trim(),
+      password: $('#auth-pass').value,
+    });
+    btn.disabled = false; btn.textContent = '登录';
+    if (error) { showGate(authErrMsg(error)); return; }
+    $('#auth-pass').value = '';
+    currentUser = data.user;
+    startApp();
+  };
+
+  // 登出、token 过期、别处失效——统一退回登录页，避免页面停在一堆空数据上
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event !== 'SIGNED_OUT' && !(event === 'TOKEN_REFRESHED' && !session)) return;
+    const expired = !!currentUser && !signingOut;   // 有登录态却不是自己点的退出 = 被动失效
+    currentUser = null;
+    signingOut = false;
+    showGate(expired ? '登录状态已失效，请重新登录' : null);
+  });
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) { currentUser = session.user; startApp(); } else { showGate(); }
+}
+
 /* ---------- 启动 ---------- */
-route();
+boot();

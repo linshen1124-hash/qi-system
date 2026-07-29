@@ -12,13 +12,17 @@
 
 **零后端服务器**。所有数据操作通过 Supabase 客户端 SDK 直接调用 PostgreSQL，前端为纯原生 HTML/CSS/JS。
 
+访问需登录（Supabase Auth 邮箱密码）。数据的实际防线是数据库的行级安全（RLS），不是前端那道登录框
+—— 详见 [DEPLOY.md](DEPLOY.md) 的"安全模型"。
+
 ## 如何开发
 
 1. Clone 仓库到本地
 2. 用任意静态服务器打开 `static/` 目录即可（VS Code Live Server / `npx serve static/`）
 3. 改完 push 到 main，Cloudflare 自动部署
 
-需要改数据库结构时，去 Supabase SQL Editor 执行 SQL。
+需要改数据库结构时，去 Supabase SQL Editor 执行 SQL。**新建表之后务必重跑 `supabase/rls.sql`**，
+否则那张新表对未登录用户是敞开的。
 
 ## 目录结构
 
@@ -31,7 +35,8 @@ qi-system/
 │   ├── fonts/         本地字体
 │   └── prototypes/    设计原型
 ├── supabase/
-│   └── migration.sql  数据库建表 + 存储函数
+│   ├── migration.sql  数据库建表 + 存储函数
+│   └── rls.sql        行级安全策略（新建表后必须重跑）
 ├── server.py          旧版 Python 后端（已废弃）
 ├── db.py              旧版 SQLite 数据层（已废弃）
 ├── tools/             辅助脚本

@@ -1062,22 +1062,14 @@ AS $$
     VALUES (p_actor, p_action, p_entity, p_entity_id, p_summary);
 $$;
 
--- ============ 20. 禁用 RLS（内网单机模式，暂不需要行级安全）============
-DO $$
-DECLARE
-    t text;
-BEGIN
-    FOR t IN
-        SELECT tablename FROM pg_tables
-        WHERE schemaname = 'public'
-    LOOP
-        EXECUTE format('ALTER TABLE %I DISABLE ROW LEVEL SECURITY', t);
-    END LOOP;
-END;
-$$;
+-- ============ 20. 行级安全（RLS）============
+-- 这里原先是"内网单机模式，禁用全部 RLS"。系统已上公网，anon key 公开在前端，
+-- 那套做法等于把全部业务表对外敞开，已废弃。RLS 的启用与策略见 rls.sql。
 
 -- ============================================================
 -- 执行完毕！接下来需要手动操作：
--- 1. 在 Supabase Storage 中创建 attachments bucket（公开）
--- 2. 部署前端静态文件到 Cloudflare Pages
+-- 1. 在 Supabase Storage 中创建 attachments bucket（私有，不要勾 Public）
+-- 2. 在 Authentication → Users 里创建登录账号
+-- 3. 部署前端静态文件到 Cloudflare Pages
+-- 4. 最后执行 rls.sql 启用行级安全（务必等前端登录版上线之后再跑）
 -- ============================================================

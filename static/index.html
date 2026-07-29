@@ -8,11 +8,27 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-<div id="app">
+<div id="auth-gate" hidden>
+  <form class="auth-card" id="auth-form" autocomplete="on">
+    <div class="auth-brand"><b>QI SYSTEM</b><small>后勤管理处 · LOGISTICS OPS</small></div>
+    <div class="auth-field">
+      <label for="auth-email">账号</label>
+      <input id="auth-email" type="email" autocomplete="username" required>
+    </div>
+    <div class="auth-field">
+      <label for="auth-pass">密码</label>
+      <input id="auth-pass" type="password" autocomplete="current-password" required>
+    </div>
+    <p class="auth-err" id="auth-err" hidden></p>
+    <button class="btn primary" id="auth-submit" type="submit">登录</button>
+  </form>
+</div>
+
+<div id="app" hidden>
   <aside class="sidebar">
     <div class="brand"><b>QI SYSTEM</b><small>后勤管理处 · LOGISTICS OPS</small></div>
     <nav id="nav"></nav>
-    <div class="sidebar-foot">v0.1 · 内网单机</div>
+    <div class="sidebar-foot" id="sidebar-foot">v0.1 · 内网单机</div>
   </aside>
   <main class="main">
     <header class="topbar">

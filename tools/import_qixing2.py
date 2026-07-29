@@ -1,9 +1,18 @@
-"""补充导入：住房、合同、人员数据"""
+"""
+补充导入：住房、合同、人员数据
+运行：SUPABASE_SERVICE_KEY=<service_role key> python tools/import_qixing2.py
+
+表已启用 RLS，anon key 写不进去，必须用 service_role key（只放环境变量，别提交）。
+"""
 import json, os, sys, glob
 import urllib.request, urllib.error
 
 SB_URL = "https://ashxgyiiluvrbsxuuurj.supabase.co"
-SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzaHhneWlpbHV2cmJzeHV1dXJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNDE2NDcsImV4cCI6MjEwMDgxNzY0N30.XfmJ3KTA-SnUdswnx9DdzRCRnxdrBLjybMeb0hLGYuY"
+SB_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
+if not SB_KEY:
+    sys.exit("缺少 SUPABASE_SERVICE_KEY 环境变量。\n"
+             "到 Supabase → Project Settings → API → service_role key 复制，然后：\n"
+             "  export SUPABASE_SERVICE_KEY='<粘贴>'")
 
 def api(method, path, data=None):
     url = f"{SB_URL}/rest/v1{path}"
