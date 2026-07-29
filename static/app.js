@@ -240,19 +240,6 @@ const MODULES = {
       F('notes', '备注', { full: 1 }),
     ],
   },
-  permit: {
-    title: '出入证 / 车证', table: 'permit', icon: '🪪',
-    columns: [['kind', '类型'], ['permit_no', '证件编号'], ['holder', '持证人'], ['plate', '车牌'], ['dept', '部门'], ['expire_date', '到期日', 'expire'], ['status', '状态', 'status']],
-    fields: [
-      F('kind', '类型', { type: 'select', options: ['出入证', '车证'], req: 1 }),
-      F('permit_no', '证件编号'), F('holder', '持证人'), F('dept', '部门'),
-      F('plate', '车牌(车证填)'),
-      F('issue_date', '发放日期', { type: 'date' }), F('expire_date', '到期日期', { type: 'date' }),
-      F('status', '状态', { type: 'select', options: ['有效', '已退', '作废'], def: '有效' }),
-      F('notes', '备注', { full: 1 }),
-    ],
-    attach: 1,
-  },
   contract: {
     title: '合同管理', table: 'contract', icon: '📄',
     columns: [['name', '合同名称'], ['category', '类别'], ['counterparty', '对方单位'], ['amount', '金额', 'money'], ['end_date', '到期日', 'expire'], ['next_pay', '下次缴费', 'expire'], ['status', '状态', 'status']],
@@ -383,17 +370,54 @@ const MODULES = {
       F('notes', '备注', { full: 1 }),
     ],
   },
-  visitor: {
-    title: '访客备案', table: 'visitor', icon: '🧾',
-    columns: [['date', '来访日期'], ['name', '访客'], ['org', '所在单位'], ['reason', '事由'], ['host', '被访人'], ['host_dept', '被访部门'], ['phone', '电话']],
-    fields: [
-      F('date', '来访日期', { type: 'date' }), F('name', '访客姓名', { req: 1 }),
-      F('gender', '性别', { type: 'select', options: ['男', '女'] }),
-      F('org', '来访人所在单位'), F('reason', '来访事由'),
-      F('host', '被访人'), F('host_dept', '被访部门'),
-      F('id_no', '证件号码'), F('phone', '联系电话'),
-      F('notes', '备注', { full: 1 }),
+  // 房产明细：一栋楼一条。字段照《院房屋总体情况表》与《电子标准院土地与建筑面积数据》定，
+  // 分四段——基本信息 / 房产证 / 土地证 / 物理参数。平面图、权证扫描件走附件。
+  property: {
+    title: '房产明细', table: 'property', icon: '🏛️',
+    hint: '一栋建筑一条记录。房产证面积与实际面积常有出入（改扩建、拆除、未测绘），两者分列便于核对。平面图与权证扫描件请传附件。',
+    columns: [
+      ['campus', '院区'], ['building', '楼号/名称'], ['usage_type', '用途分类'],
+      ['cert_area', '证载面积㎡', 'num'], ['actual_area', '实际面积㎡', 'num'],
+      ['floors', '层数'], ['built_year', '建成年代'], ['cert_status', '权证状态', 'status'],
     ],
+    fields: [
+      // —— 基本信息 ——
+      F('campus', '院区', { type: 'select', req: 1, options: ['安定门院区', '亦庄院区', '万寿路27号院', '青龙胡同35号院', '门楼胡同3号院', '鼓楼东大街24号院', '苏州新扬产业园', '其他'] }),
+      F('building', '楼号及名称（如 1号科研楼 / A座科研楼）', { req: 1 }),
+      F('address', '坐落位置', { full: 1 }),
+      F('usage_type', '用途分类', { type: 'select', options: ['科研办公用房', '科研实验用房', '业务用房', '服务用房', '设备用房', '附属用房', '住宅', '其他用房'] }),
+      F('acquire_way', '取得方式', { type: 'select', options: ['自建', '购置', '划拨', '接收', '租入'] }),
+      F('acquire_date', '取得日期', { type: 'date' }),
+
+      // —— 房产证 / 不动产权证 ——
+      F('cert_type', '权属证明类型', { type: 'select', options: ['房屋所有权证', '不动产权证', '暂无（办理中）', '无'] }),
+      F('cert_no', '权证编号（如 京房权证东字第030704）'),
+      F('cert_owner', '权属人', { def: '本单位' }),
+      F('cert_date', '发证日期', { type: 'date' }),
+      F('cert_building_no', '房产证栋号'),
+      F('cert_area', '证载建筑面积(㎡)', { type: 'number' }),
+      F('ownership', '权属性质', { type: 'select', options: ['国有', '集体', '私有'], def: '国有' }),
+      F('cert_status', '权证状态', { type: 'select', options: ['已办结', '办理中', '未办理', '需重新测绘'], def: '已办结' }),
+
+      // —— 土地证 ——
+      F('land_cert_no', '土地证/不动产权证号'),
+      F('land_area', '院区土地面积(㎡)', { type: 'number' }),
+      F('land_use', '土地用途', { type: 'select', options: ['科研', '办公', '工业', '住宅', '综合', '其他'] }),
+      F('land_right_type', '土地使用权类型', { type: 'select', options: ['划拨', '出让', '租赁', '其他'] }),
+      F('land_start', '土地使用起始日', { type: 'date' }),
+      F('land_end', '土地使用终止日', { type: 'date' }),
+
+      // —— 物理参数 ——
+      F('actual_area', '实际建筑面积(㎡)', { type: 'number' }),
+      F('above_area', '地上面积(㎡)', { type: 'number' }),
+      F('under_area', '地下面积(㎡)', { type: 'number' }),
+      F('floors', '层数（如 9/2 表示地上9层地下2层）'),
+      F('built_year', '建成年代（如 80年代 / 2006）'),
+      F('structure', '建筑结构', { type: 'select', options: ['钢筋混凝土', '砖混', '钢结构', '砖木', '其他'] }),
+      F('plan_file', '平面图文件路径', { full: 1 }),
+      F('notes', '备注（改扩建、拆除、测绘情况等）', { full: 1 }),
+    ],
+    attach: 1,
   },
   publicity: {
     title: '宣传报道', table: 'publicity', icon: '📰',
@@ -465,7 +489,7 @@ const NAV = [
   { group: '采购与资产', items: [['procurement', '采购台账', 'Procurement', 'cart'], ['asset', '固定资产', 'Assets', 'asset']] },
   { group: '合同与费用', items: [['contract', '合同管理', 'Contracts', 'contract'], ['fee_bill', '费用缴纳', 'Fees', 'fee']] },
   { group: '车辆与司机', items: [['trip_record', '行车记录', 'Trip Records', 'trip'], ['subsidy', '司机补助', 'Subsidies', 'subsidy'], ['driver', '司机档案', 'Drivers', 'driver'], ['vehicle', '车辆档案', 'Vehicles', 'vehicle']] },
-  { group: '房产与用房', items: [['room', '用房分配', 'Rooms', 'room'], ['housing', '职工住房', 'Housing', 'home'], ['permit', '出入证/车证', 'Permits', 'permit'], ['visitor', '访客备案', 'Visitors', 'people']] },
+  { group: '房屋管理', items: [['room', '用房分配', 'Rooms', 'room'], ['property', '房产明细', 'Properties', 'home']] },
   { group: '节能管理', items: [['energy_summary', '能耗汇总', 'Energy Summary', 'energy'], ['energy_reading', '能耗台账', 'Energy Ledger', 'energy'], ['energy_activity', '节能宣传', 'Energy Programs', 'megaphone']] },
   { group: '人事工会', items: [['staff', '职工花名册', 'Staff', 'people'], ['welfare', '福利发放', 'Welfare', 'gift']] },
   { group: '宣传报道', items: [['publicity', '宣传报道', 'Publicity', 'news']] },
@@ -475,12 +499,12 @@ const NAV = [
 
 const KICKER = {
   dashboard: 'OVERVIEW', trip_record: 'TRIP RECORDS', subsidy: 'DRIVER SUBSIDIES',
-  driver: 'DRIVERS', vehicle: 'VEHICLES', room: 'ROOM ALLOCATION', permit: 'PERMITS',
+  driver: 'DRIVERS', vehicle: 'VEHICLES', room: 'ROOM ALLOCATION', property: 'PROPERTIES',
   contract: 'CONTRACTS', fee_bill: 'FEES', todo: 'TASKS', settings: 'SETTINGS',
   energy_summary: 'ENERGY SUMMARY', energy_reading: 'ENERGY LEDGER', energy_activity: 'ENERGY PROGRAMS',
   procurement: 'PROCUREMENT', asset: 'FIXED ASSETS',
   staff: 'STAFF ROSTER', welfare: 'WELFARE',
-  housing: 'STAFF HOUSING', visitor: 'VISITORS',
+  housing: 'STAFF HOUSING',
   publicity: 'PUBLICITY', archive_index: 'ARCHIVE',
   rule_source: 'RULE SOURCES', rule: 'RULES', obligations: 'OBLIGATIONS', audit: 'AUDIT LOG',
 };
@@ -540,7 +564,8 @@ async function viewDashboard() {
   const cards = [
     ['在岗司机', c.driver, '人', 'driver', 'var(--neon)'], ['在用车辆', c.vehicle, '辆', 'vehicle', 'var(--neon-2)'],
     ['行车记录', c.trip, '条', 'trip', 'var(--orange)'], ['登记用房', c.room, '间', 'room', 'var(--surface-dim)'],
-    ['有效证件', c.permit, '个', 'permit', 'var(--neon-2)'], ['在执行合同', c.contract, '份', 'contract', 'var(--warn)'],
+    ['房产明细', c.property, '栋', 'home', 'var(--neon-2)'], ['在住职工', c.housing, '户', 'home', 'var(--purple-deep)'],
+    ['在执行合同', c.contract, '份', 'contract', 'var(--warn)'],
     ['在办采购', c.procurement, '项', 'cart', 'var(--orange)'], ['在用资产', c.asset, '项', 'asset', 'var(--surface-dim)'],
     ['在册职工', c.staff, '人', 'people', 'var(--neon)'],
     ['待办义务', c.obligation_open, '项', 'scale', 'var(--warn)'], ['逾期义务', c.obligation_overdue, '项', 'scale', 'var(--danger, #ef4444)'],
@@ -618,21 +643,25 @@ async function viewRoomAlloc() {
   const sub = viewRoomAlloc._sub || 'office';
   viewRoomAlloc._sub = sub;
 
+  // 三个 sheet 各自对应不同的新增目标
+  const ADD = { office: ['room', '用房'], dorm: ['dorm', '床位'], housing: ['housing', '住户'] };
+  const [addKey, addLabel] = ADD[sub];
   const actions = $('#topbar-actions'); actions.innerHTML = '';
-  const addBtn = el(`<button class="btn primary">${icon('plus')}新增${sub === 'dorm' ? '床位' : '用房'}</button>`);
-  addBtn.onclick = () => openForm(sub === 'dorm' ? 'dorm' : 'room', null);
+  const addBtn = el(`<button class="btn primary">${icon('plus')}新增${addLabel}</button>`);
+  addBtn.onclick = () => openForm(addKey, null);
   actions.appendChild(addBtn);
 
   const view = $('#view');
   const tab = (k, label) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${label}</button>`;
   view.innerHTML = `
-    <div class="segbar">${tab('office', '🏢 办公用房')}${tab('dorm', '🛏️ 宿舍用房')}</div>
+    <div class="segbar">${tab('office', '🏢 办公用房')}${tab('dorm', '🛏️ 宿舍用房')}${tab('housing', '🏠 职工住房')}</div>
     <div id="ra-body"><div class="empty">加载中…</div></div>`;
   view.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => { viewRoomAlloc._sub = b.dataset.sub; viewRoomAlloc(); });
 
   const body = $('#ra-body');
   if (sub === 'office') await renderOfficeRooms(body);
-  else await renderDormRooms(body);
+  else if (sub === 'dorm') await renderDormRooms(body);
+  else await renderModuleTable('housing', body);
 }
 
 async function renderOfficeRooms(body) {
@@ -771,8 +800,14 @@ async function viewModule(key) {
   const addBtn = el(`<button class="btn primary">${icon('plus')}新增</button>`);
   addBtn.onclick = () => openForm(key, null);
   actions.appendChild(addBtn);
+  await renderModuleTable(key, $('#view'));
+}
 
-  const view = $('#view'); view.innerHTML = '<div class="empty">加载中…</div>';
+// 表格渲染独立出来，好让模块既能当独立页面，也能作为 sheet 嵌进别的视图
+// （职工住房就是以 sheet 形式挂在"用房分配"下面的）
+async function renderModuleTable(key, view) {
+  const m = MODULES[key];
+  view.innerHTML = '<div class="empty">加载中…</div>';
   const rows = await api.get('/' + m.table);
 
   const head = m.columns.map(col => { const [, label, t] = col; return `<th class="${t === 'num' || t === 'money' ? 'num' : ''}${isWrapCol(col) ? ' wrapcol' : ''}">${label}</th>`; }).join('') + '<th></th>';
