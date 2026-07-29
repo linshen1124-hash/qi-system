@@ -104,7 +104,10 @@ def call(method, path, body=None, extra_headers=None):
     }
     headers.update(extra_headers or {})
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(f"{SB_URL}/rest/v1{path}", data=data,
+    # 百分号编码非 ASCII（--where 'campus=eq.青龙胡同35号院' 这类），
+    # 同时保留 PostgREST 查询语法里的分隔符不动
+    safe_path = urllib.parse.quote(path, safe="/?&=.,()*:+-_~!$'")
+    req = urllib.request.Request(f"{SB_URL}/rest/v1{safe_path}", data=data,
                                  headers=headers, method=method)
     try:
         resp = urllib.request.urlopen(req)
@@ -185,7 +188,8 @@ def main():
         print(f"{'表名':<18}{'行数':>8}")
         print("-" * 26)
         for t in TABLES:
-            _, h = call("GET", f"/{t}?select=id", None,
+            # 用 select=* 而不是 select=id：setting 表的主键是 key，没有 id 列
+            _, h = call("GET", f"/{t}?select=*", None,
                         {"Prefer": "count=exact", "Range": "0-0"})
             cnt = (h.get("content-range") or "*/?").split("/")[-1]
             print(f"{t:<18}{cnt:>8}")
@@ -198,8 +202,9 @@ def main():
         where = arg(argv, "--where")
         cols = arg(argv, "--cols", "*")
         limit = arg(argv, "--limit")
-        order = arg(argv, "--order", "id")
-        q = [f"select={urllib.parse.quote(cols)}", f"order={order}"]
+        # setting 表没有 id 列，默认排序键要跟着变
+        order = arg(argv, "--order", "key" if table == "setting" else "id")
+        q = [f"select={cols}", f"order={order}"]   # 编码统一在 call() 里做，此处别重复
         if where:
             q.append(where)
         if limit:
