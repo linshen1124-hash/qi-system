@@ -51,6 +51,35 @@ anon key 是公开的，写在前端 JS 里谁都能抠出来。**真正拦住�
 填邮箱和密码，勾上 Auto Confirm User（否则对方要先收确认邮件）。
 停用某人：在同一页面把该用户删掉或 Ban 掉，其登录态最长一小时内失效。
 
+## 无界面操作端（tools/qi.py）
+
+系统的价值在数据和规则，UI 只是给人看的一层。`tools/qi.py` 把数据层和规则层
+直接暴露成命令行，用于批量核查、跨模块统计、调规则引擎、做系统里没有的分析。
+
+它用一个**专属账号**登录，拿的是普通 authenticated 身份——权限与一个登录职工相同，
+RLS 照常生效，写操作照常记入 audit_log（actor 为该账号邮箱，便于区分人工与自动操作）。
+刻意不用 service_role key：那个绕过全部 RLS，日常操作不需要那么大权限。
+
+准备：在 Authentication → Users 建一个专用账号（如 `agent@…`），然后
+
+```
+export QI_AGENT_EMAIL='...'
+export QI_AGENT_PASSWORD='...'
+```
+
+凭据只从环境变量读，不写进代码、不进仓库。常用：
+
+```
+python3 tools/qi.py tables                                  各表行数总览
+python3 tools/qi.py get housing --where 'area=is.null'      条件查询
+python3 tools/qi.py rpc get_dashboard                       调存储函数（规则层）
+python3 tools/qi.py rpc dorm_fee_review
+python3 tools/qi.py patch housing 12 --set fee_year=391.92  预演
+python3 tools/qi.py patch housing 12 --set fee_year=391.92 --yes   真写
+```
+
+**写操作默认只预演**，打印改动前后对比，必须显式加 `--yes` 才落库。
+
 ## 如何协作开发
 
 1. 对方在 GitHub 加你为仓库 Collaborator
