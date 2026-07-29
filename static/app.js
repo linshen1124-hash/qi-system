@@ -370,44 +370,61 @@ const MODULES = {
       F('notes', '备注', { full: 1 }),
     ],
   },
-  // 房产明细：一栋楼一条。字段照《院房屋总体情况表》与《电子标准院土地与建筑面积数据》定，
-  // 分四段——基本信息 / 房产证 / 土地证 / 物理参数。平面图、权证扫描件走附件。
-  property: {
-    title: '房产明细', table: 'property', icon: '🏛️',
-    hint: '一栋建筑一条记录。房产证面积与实际面积常有出入（改扩建、拆除、未测绘），两者分列便于核对。平面图与权证扫描件请传附件。',
+  // 房产证（父）。权属核对以证为单位：一本证含多幢，一栋楼也可能跨多个证载栋号
+  // （如 4号食堂 = 栋号 15、16、17 三幢）。
+  property_cert: {
+    title: '房产证', table: 'property_cert', icon: '📜',
     columns: [
-      ['campus', '院区'], ['building', '楼号/名称'], ['usage_type', '用途分类'],
-      ['cert_area', '证载面积㎡', 'num'], ['actual_area', '实际面积㎡', 'num'],
-      ['floors', '层数'], ['built_year', '建成年代'], ['cert_status', '权证状态', 'status'],
+      ['cert_no', '证号'], ['cert_type', '证书类型'], ['campus', '院区'],
+      ['building_count', '证载幢数', 'num'], ['building_area', '房屋建筑面积㎡', 'num'],
+      ['land_area', '宗地面积㎡', 'num'], ['register_date', '登记日期'], ['status', '状态', 'status'],
     ],
     fields: [
-      // —— 基本信息 ——
+      F('cert_no', '证号', { req: 1, full: 1 }),
+      F('cert_type', '证书类型', { type: 'select', options: ['房屋所有权证', '不动产权证', '国有土地使用证'] }),
+      F('serial_no', '证书编号 No.'),
+      F('owner', '权利人'),
+      F('co_ownership', '共有情况'),
+      F('campus', '归属院区', { type: 'select', options: ['安定门院区', '亦庄院区', '万寿路27号院', '苏州新扬产业园', '其他'] }),
+      F('address', '证载坐落', { full: 1 }),
+      F('building_count', '证载幢数', { type: 'number' }),
+      F('unit_no', '不动产单元号', { full: 1 }),
+      F('planned_use', '规划用途 / 用途', { full: 1 }),
+      F('building_area', '房屋建筑面积(㎡)', { type: 'number' }),
+      F('land_area', '宗地/土地使用权面积(㎡)', { type: 'number' }),
+      F('land_no', '地号'),
+      F('land_use', '地类（用途）'),
+      F('land_right_type', '使用权类型', { type: 'select', options: ['划拨', '出让', '租赁', '其他'] }),
+      F('land_start', '土地使用起始日', { type: 'date' }),
+      F('land_end', '土地使用终止日', { type: 'date' }),
+      F('register_date', '登记日期', { type: 'date' }),
+      F('register_org', '登记机构', { full: 1 }),
+      F('status', '状态', { type: 'select', options: ['现行有效', '办理中', '已注销', '需重新测绘'], def: '现行有效' }),
+      F('scan_file', '扫描件路径', { full: 1 }),
+      F('notes', '备注', { full: 1 }),
+    ],
+    attach: 1,
+  },
+  // 幢（子）。挂在房产证下面，也允许 cert_id 为空——未登记建筑就是这种。
+  property: {
+    title: '幢/楼明细', table: 'property', icon: '🏛️',
+    hint: '一栋建筑一条。证载面积与实际面积分列：两者在源数据里普遍不符（改扩建、拆除、未测绘），合并会丢掉核对线索。未挂靠任何房产证的即未登记建筑。',
+    columns: [
+      ['campus', '院区'], ['building', '楼号/名称'], ['usage_type', '用途分类'],
+      ['cert_building_no', '证载栋号'], ['cert_area', '证载面积㎡', 'num'],
+      ['actual_area', '实际面积㎡', 'num'], ['floors', '层数'], ['built_year', '建成年代'],
+    ],
+    fields: [
+      F('cert_id', '所属房产证', { type: 'ref', ref: 'property_cert', show: 'cert_no', full: 1 }),
       F('campus', '院区', { type: 'select', req: 1, options: ['安定门院区', '亦庄院区', '万寿路27号院', '青龙胡同35号院', '门楼胡同3号院', '鼓楼东大街24号院', '苏州新扬产业园', '其他'] }),
       F('building', '楼号及名称（如 1号科研楼 / A座科研楼）', { req: 1 }),
       F('address', '坐落位置', { full: 1 }),
       F('usage_type', '用途分类', { type: 'select', options: ['科研办公用房', '科研实验用房', '业务用房', '服务用房', '设备用房', '附属用房', '住宅', '其他用房'] }),
       F('acquire_way', '取得方式', { type: 'select', options: ['自建', '购置', '划拨', '接收', '租入'] }),
       F('acquire_date', '取得日期', { type: 'date' }),
-
-      // —— 房产证 / 不动产权证 ——
-      F('cert_type', '权属证明类型', { type: 'select', options: ['房屋所有权证', '不动产权证', '暂无（办理中）', '无'] }),
-      F('cert_no', '权证编号（如 京房权证东字第030704）'),
-      F('cert_owner', '权属人', { def: '本单位' }),
-      F('cert_date', '发证日期', { type: 'date' }),
-      F('cert_building_no', '房产证栋号'),
+      F('cert_building_no', '证载栋号（如 15、16、17）'),
       F('cert_area', '证载建筑面积(㎡)', { type: 'number' }),
-      F('ownership', '权属性质', { type: 'select', options: ['国有', '集体', '私有'], def: '国有' }),
       F('cert_status', '权证状态', { type: 'select', options: ['已办结', '办理中', '未办理', '需重新测绘'], def: '已办结' }),
-
-      // —— 土地证 ——
-      F('land_cert_no', '土地证/不动产权证号'),
-      F('land_area', '院区土地面积(㎡)', { type: 'number' }),
-      F('land_use', '土地用途', { type: 'select', options: ['科研', '办公', '工业', '住宅', '综合', '其他'] }),
-      F('land_right_type', '土地使用权类型', { type: 'select', options: ['划拨', '出让', '租赁', '其他'] }),
-      F('land_start', '土地使用起始日', { type: 'date' }),
-      F('land_end', '土地使用终止日', { type: 'date' }),
-
-      // —— 物理参数 ——
       F('actual_area', '实际建筑面积(㎡)', { type: 'number' }),
       F('above_area', '地上面积(㎡)', { type: 'number' }),
       F('under_area', '地下面积(㎡)', { type: 'number' }),
@@ -543,6 +560,7 @@ function route() {
   renderNav(key);
   if (key === 'dashboard') return viewDashboard();
   if (key === 'room') return viewRoomAlloc();
+  if (key === 'property') return viewProperty();
   if (key === 'subsidy') return viewSubsidy();
   if (key === 'energy_summary') return viewEnergySummary();
   if (key === 'obligations') return viewObligations();
@@ -636,6 +654,133 @@ td.lbl{width:110px;background:#f5f5f5;text-align:center;white-space:nowrap}
 <div class="sign"><div>部门负责人：___________</div><div>经办人：___________</div></div>
 </div></body></html>`);
   w.document.close();
+}
+
+/* ---------- 房产明细：房产证 → 幢 两级 ---------- */
+async function viewProperty() {
+  setTitle('property', '房产明细');
+  const actions = $('#topbar-actions'); actions.innerHTML = '';
+  const addCert = el(`<button class="btn">${icon('plus')}新增房产证</button>`);
+  addCert.onclick = () => openForm('property_cert', null);
+  const addBld = el(`<button class="btn primary">${icon('plus')}新增幢</button>`);
+  addBld.onclick = () => openForm('property', null);
+  actions.appendChild(addCert); actions.appendChild(addBld);
+
+  const view = $('#view'); view.innerHTML = '<div class="empty">加载中…</div>';
+  const [certs, blds] = await Promise.all([
+    api.get('/property_cert'), api.get('/property'),
+  ]);
+
+  const n2 = (v) => v == null ? '' : Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+  const under = (cid) => (blds || []).filter(b => b.cert_id == cid);
+  const orphans = (blds || []).filter(b => !b.cert_id);
+
+  // 子表：一本证名下的各幢
+  const detail = (list, cert) => {
+    if (!list.length) return '<div class="empty">该证名下暂无幢记录</div>';
+    const sumC = list.reduce((a, b) => a + (b.cert_area || 0), 0);
+    const sumA = list.reduce((a, b) => a + (b.actual_area || 0), 0);
+    // 证载合计与各幢证载之和应当相等，不等就是漏挂或错挂
+    const gap = cert ? (cert.building_area || 0) - sumC : 0;
+    return `<table class="sub"><thead><tr>
+        <th>楼号/名称</th><th>用途</th><th>证载栋号</th>
+        <th class="num">证载㎡</th><th class="num">实际㎡</th>
+        <th>层数</th><th>建成</th><th></th></tr></thead><tbody>
+      ${list.map(b => `<tr>
+        <td><b>${esc(b.building)}</b></td><td class="muted">${esc(b.usage_type || '')}</td>
+        <td>${esc(b.cert_building_no || '')}</td>
+        <td class="num">${n2(b.cert_area)}</td>
+        <td class="num">${n2(b.actual_area)}</td>
+        <td>${esc(b.floors || '')}</td><td>${esc(b.built_year || '')}</td>
+        <td class="actions"><button class="btn link sm" data-edit-b="${b.id}">编辑</button></td></tr>`).join('')}
+      <tr style="background:var(--surface-dim);font-weight:700">
+        <td colspan="3">小计 ${list.length} 幢</td>
+        <td class="num">${n2(sumC)}</td><td class="num">${n2(sumA)}</td>
+        <td colspan="3">${cert && Math.abs(gap) > 0.01
+          ? `<span class="tag danger">与证载差 ${n2(gap)}㎡</span>`
+          : (cert ? '<span class="tag ok">与证载相符</span>' : '')}</td></tr>
+      </tbody></table>`;
+  };
+
+  const certRow = (c) => {
+    const list = under(c.id);
+    const isLand = c.cert_type === '国有土地使用证';
+    const sumA = list.reduce((a, b) => a + (b.actual_area || 0), 0);
+    const unreg = !isLand && c.building_area ? sumA - c.building_area : 0;
+    return `
+      <div class="panel" style="margin-bottom:14px">
+        <div class="panel-h" style="cursor:pointer" data-toggle="${c.id}">
+          <h2 style="font-size:15px">
+            <span class="ic">${icon('book')}</span>
+            ${esc(c.cert_no)}
+            <span class="tag ${isLand ? 'accent' : ''}">${esc(c.cert_type || '')}</span>
+            ${c.status && c.status !== '现行有效' ? `<span class="tag warn">${esc(c.status)}</span>` : ''}
+          </h2>
+          <div style="display:flex;gap:14px;align-items:center;font-size:12.5px">
+            ${isLand
+              ? `<span>宗地 <b>${n2(c.land_area)}</b> ㎡</span>`
+              : `<span>证载 <b>${n2(c.building_area)}</b> ㎡</span>
+                 <span class="muted">${c.building_count || '—'} 幢 / 已挂 ${list.length}</span>
+                 ${Math.abs(unreg) > 0.01 ? `<span class="tag ${unreg > 0 ? 'warn' : 'danger'}">实际${unreg > 0 ? '多' : '少'} ${n2(Math.abs(unreg))}㎡</span>` : ''}`}
+            <button class="btn link sm" data-edit-c="${c.id}">编辑</button>
+            <span class="caret" id="caret-${c.id}">▸</span>
+          </div>
+        </div>
+        <div class="panel-b" id="body-${c.id}" hidden>
+          <div class="cert-meta">
+            <span><b>权利人</b> ${esc(c.owner || '—')}</span>
+            <span><b>坐落</b> ${esc(c.address || '—')}</span>
+            <span><b>用途</b> ${esc(c.planned_use || c.land_use || '—')}</span>
+            <span><b>取得方式</b> ${esc(c.land_right_type || '—')}</span>
+            <span><b>登记</b> ${esc(c.register_date || '—')}${c.register_org ? ' · ' + esc(c.register_org) : ''}</span>
+            ${c.land_end ? `<span><b>使用期限</b> ${esc(c.land_start || '')} 至 ${esc(c.land_end)}</span>` : ''}
+            ${c.notes ? `<span class="full muted">${esc(c.notes)}</span>` : ''}
+          </div>
+          ${isLand ? '' : `<div style="overflow-x:auto">${detail(list, c)}</div>`}
+        </div>
+      </div>`;
+  };
+
+  const totalCert = (certs || []).filter(c => c.cert_type !== '国有土地使用证')
+    .reduce((a, c) => a + (c.building_area || 0), 0);
+  const totalActual = (blds || []).reduce((a, b) => a + (b.actual_area || 0), 0);
+
+  view.innerHTML = `
+    <div class="mini-cards">
+      <div class="mini-card"><div class="mk-k">权证</div><div class="mk-v">${(certs || []).length}<small> 本</small></div></div>
+      <div class="mini-card"><div class="mk-k">幢/楼</div><div class="mk-v">${(blds || []).length}<small> 栋</small></div></div>
+      <div class="mini-card"><div class="mk-k">证载建筑面积</div><div class="mk-v">${n2(Math.round(totalCert))}<small> ㎡</small></div></div>
+      <div class="mini-card"><div class="mk-k">实际建筑面积</div><div class="mk-v">${n2(Math.round(totalActual))}<small> ㎡</small></div></div>
+      <div class="mini-card"><div class="mk-k">未登记面积</div><div class="mk-v">${n2(Math.round(totalActual - totalCert))}<small> ㎡</small></div></div>
+    </div>
+    <div class="hint">点击证号展开该证名下各幢。证载面积应等于名下各幢证载之和；实际面积超出部分即未办证登记的建筑。</div>
+    ${(certs || []).map(certRow).join('')}
+    ${orphans.length ? `
+      <div class="panel" style="margin-bottom:14px">
+        <div class="panel-h" style="cursor:pointer" data-toggle="none">
+          <h2 style="font-size:15px"><span class="ic">${icon('home')}</span>未挂靠任何房产证
+            <span class="tag warn">${orphans.length} 幢</span></h2>
+          <span class="caret" id="caret-none">▸</span>
+        </div>
+        <div class="panel-b" id="body-none" hidden>
+          <div class="hint" style="margin:12px">这些建筑证载面积为空，属未办理权属登记的部分。</div>
+          <div style="overflow-x:auto">${detail(orphans, null)}</div>
+        </div>
+      </div>` : ''}`;
+
+  view.querySelectorAll('[data-toggle]').forEach(h => h.onclick = (e) => {
+    if (e.target.closest('[data-edit-c]')) return;   // 点"编辑"不触发展开
+    const k = h.dataset.toggle;
+    const body = view.querySelector('#body-' + k);
+    body.hidden = !body.hidden;
+    view.querySelector('#caret-' + k).textContent = body.hidden ? '▸' : '▾';
+  });
+  view.querySelectorAll('[data-edit-c]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    openForm('property_cert', (certs || []).find(c => c.id == b.dataset.editC));
+  });
+  view.querySelectorAll('[data-edit-b]').forEach(b => b.onclick = () =>
+    openForm('property', (blds || []).find(x => x.id == b.dataset.editB)));
 }
 
 async function viewRoomAlloc() {

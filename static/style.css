@@ -256,3 +256,21 @@ thead th:last-child{position:sticky;right:0;background:var(--purple-deep);border
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sidebar-foot .btn.link{color:rgba(255,255,255,.75);font-size:11px;padding:0}
 .sidebar-foot .btn.link:hover{color:#fff}
+
+/* ============ 房产证展开视图 ============ */
+.caret{font-size:13px;color:var(--muted);width:14px;display:inline-block;text-align:center}
+.cert-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px 22px;
+  padding:14px 20px;border-bottom:2px solid rgba(22,28,39,.12);font-size:12.5px}
+.cert-meta span.full{grid-column:1/-1}
+.cert-meta b{font-weight:700;margin-right:6px;color:var(--muted)}
+table.sub{width:100%;border-collapse:collapse;font-size:13px}
+/* 需显式覆盖全局 thead 的紫底白字，否则子表表头是白字落浅底、看不见 */
+table.sub thead tr{background:var(--surface)}
+table.sub thead th{background:var(--surface);color:var(--ink);text-align:left;padding:9px 12px;
+  border-bottom:2px solid var(--ink);font-size:12px;font-weight:700;white-space:nowrap}
+table.sub thead th:last-child{position:static;background:var(--surface);border-left:none}
+table.sub thead th.num,table.sub td.num{text-align:right}
+table.sub td{padding:8px 12px;border-bottom:1px solid rgba(22,28,39,.1);white-space:nowrap}
+table.sub tbody tr:hover{background:var(--surface-dim)}
+.tag.ok{background:var(--neon);color:var(--ink)}
+.tag.warn{background:var(--warn);color:#fff}
