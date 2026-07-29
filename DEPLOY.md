@@ -6,19 +6,11 @@
 |---|---|---|
 | GitHub 仓库 | ✅ 完成 | https://github.com/linshen1124-hash/qi-system |
 | Supabase 数据库 | ✅ 完成 | https://ashxgyiiluvrbsxuuurj.supabase.co |
-| Cloudflare Pages 部署 | ⚠️ 差最后一步 | 已部署到 https://qi-system.linshen1124.workers.dev |
-| 自定义域名 | ⚠️ 差在 Cloudflare 绑定域名 | chuanjiu-qi.top（NS 已切到 Cloudflare） |
+| Cloudflare 部署 | ✅ 完成 | push 到 main 自动部署 |
+| 正式访问地址 | ✅ 完成 | **https://chuanjiu-qi.top** |
+| 登录与行级安全 | ✅ 完成 | Supabase Auth + RLS，已实测外部无法读写 |
 
-## 你只需要做的：把域名挂到 Cloudflare Worker 上
-
-1. 登录 https://dash.cloudflare.com
-2. 左侧点 Workers & Pages
-3. 找到 qi-system 项目，点进去
-4. 顶部点 Settings 选项卡
-5. 在 Domains & Routes / Triggers 区域，点 Add Custom Domain
-6. 输入 chuanjiu-qi.top，确认添加
-
-完成。
+> `qi-system.linshen1124.workers.dev` 那个地址报 error 1042 已不可用，正式入口以自定义域名为准。
 
 ## 技术架构
 
