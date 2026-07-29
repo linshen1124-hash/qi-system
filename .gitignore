@@ -8,3 +8,7 @@ tmp_pdf_images/
 QI_SYSTEM.app/
 .claude/
 node_modules/
+
+# supabase CLI 链接产物
+supabase/.temp/
+.branches/
