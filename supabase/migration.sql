@@ -160,18 +160,12 @@ CREATE TABLE IF NOT EXISTS energy_activity (
     notes    TEXT
 );
 
--- ============ 6. 规章制度 ============
-CREATE TABLE IF NOT EXISTS regulation (
-    id           BIGSERIAL PRIMARY KEY,
-    title        TEXT NOT NULL,
-    document_no  TEXT,
-    category     TEXT,
-    issue_date   DATE,
-    dept         TEXT,
-    status       TEXT DEFAULT '现行有效',
-    notes        TEXT,
-    created      TIMESTAMPTZ DEFAULT now()
-);
+-- ============ 6. 规章制度（已废弃，2026-07-29 移除）============
+-- 与 rule_source（制度依据库）重复：字段一一对应（title/name、document_no/doc_no、
+-- category/domain、dept/issuer、issue_date/year），而 rule_source 严格更强——
+-- 多了 level(层级)、url(官方链接)、source_file(院内档案原件路径)，
+-- 且被 rule.source_id 挂靠、接进了规则引擎。
+-- regulation 始终 0 行、无外键引用、无规则以它为目标表，属纯冗余设计，已 DROP。
 
 -- ============ 7. 采购管理 ============
 CREATE TABLE IF NOT EXISTS procurement (

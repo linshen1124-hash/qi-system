@@ -53,7 +53,7 @@ ANON_KEY = ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi
 TABLES = [
     "setting", "app_user", "driver", "vehicle", "trip_record", "subsidy_month",
     "room", "permit", "contract", "fee_bill", "energy_reading", "energy_activity",
-    "regulation", "procurement", "asset", "staff", "welfare", "housing", "visitor",
+    "procurement", "asset", "staff", "welfare", "housing", "visitor",
     "dorm", "dorm_site", "publicity", "archive_index", "rule_source", "rule",
     "obligation", "audit_log", "todo", "attachment",
 ]

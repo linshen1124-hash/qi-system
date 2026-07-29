@@ -315,20 +315,6 @@ const MODULES = {
     ],
     attach: 1,
   },
-  regulation: {
-    title: '规章制度', table: 'regulation', icon: '📋',
-    columns: [['title', '标题'], ['category', '类别'], ['document_no', '文号'], ['dept', '发布部门'], ['issue_date', '发布日期'], ['status', '状态', 'status']],
-    fields: [
-      F('title', '标题', { req: 1, full: 1 }),
-      F('category', '类别', { type: 'select', options: ['法规', '条例', '办法', '规定', '通知', '管理办法', '细则', '其他'] }),
-      F('document_no', '文号'),
-      F('dept', '发布部门'),
-      F('issue_date', '发布日期', { type: 'date' }),
-      F('status', '状态', { type: 'select', options: ['现行有效', '已废止', '已修订'], def: '现行有效' }),
-      F('notes', '内容摘要/备注', { full: 1 }),
-    ],
-    attach: 1,
-  },
   procurement: {
     title: '采购台账', table: 'procurement', icon: '🛒',
     columns: [['year_batch', '年度/批次'], ['name', '项目名称'], ['category', '类别'], ['budget', '预算(万元)', 'num'], ['method', '采购方式'], ['supplier', '成交供应商'], ['owner', '承办人'], ['status', '状态', 'status']],
@@ -483,7 +469,7 @@ const NAV = [
   { group: '节能管理', items: [['energy_summary', '能耗汇总', 'Energy Summary', 'energy'], ['energy_reading', '能耗台账', 'Energy Ledger', 'energy'], ['energy_activity', '节能宣传', 'Energy Programs', 'megaphone']] },
   { group: '人事工会', items: [['staff', '职工花名册', 'Staff', 'people'], ['welfare', '福利发放', 'Welfare', 'gift']] },
   { group: '宣传报道', items: [['publicity', '宣传报道', 'Publicity', 'news']] },
-  { group: '规则与制度', items: [['obligations', '合规义务', 'Obligations', 'scale'], ['rule', '规则库', 'Rules', 'scale'], ['rule_source', '制度依据库', 'Rule Sources', 'book'], ['regulation', '规章制度', 'Regulations', 'book'], ['audit', '审计日志', 'Audit Log', 'todo']] },
+  { group: '规则与制度', items: [['obligations', '合规义务', 'Obligations', 'scale'], ['rule', '规则库', 'Rules', 'scale'], ['rule_source', '制度依据库', 'Rule Sources', 'book'], ['audit', '审计日志', 'Audit Log', 'todo']] },
   { group: '综合事务', items: [['archive_index', '档案索引', 'Archive', 'book'], ['todo', '待办事项', 'Tasks', 'todo'], ['settings', '系统设置', 'Settings', 'settings']] },
 ];
 
@@ -492,7 +478,6 @@ const KICKER = {
   driver: 'DRIVERS', vehicle: 'VEHICLES', room: 'ROOM ALLOCATION', permit: 'PERMITS',
   contract: 'CONTRACTS', fee_bill: 'FEES', todo: 'TASKS', settings: 'SETTINGS',
   energy_summary: 'ENERGY SUMMARY', energy_reading: 'ENERGY LEDGER', energy_activity: 'ENERGY PROGRAMS',
-  regulation: 'REGULATIONS',
   procurement: 'PROCUREMENT', asset: 'FIXED ASSETS',
   staff: 'STAFF ROSTER', welfare: 'WELFARE',
   housing: 'STAFF HOUSING', visitor: 'VISITORS',
