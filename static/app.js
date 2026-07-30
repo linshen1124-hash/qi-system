@@ -813,13 +813,15 @@ function renderFeeLine(body, rows, line) {
   const isRent = line === '院向内部部门收房租';
   const total = list.reduce((a, r) => a + (r.amount || 0), 0);
 
+  // 内部房租每个部门有房租与物业费两条，费用类型必须显示，否则两行只有金额不同、无从分辨
   const head = isRent
-    ? ['年度', '期间', '部门', '房屋/场所', '面积㎡', '标准', '金额', '状态', '确认日', '分摊日', '']
+    ? ['年度', '期间', '部门', '费用类型', '面积㎡', '标准', '金额', '状态', '确认日', '分摊日', '']
     : ['年度', '期间', '付款方', '收款方', '费用类型', '房屋/场所', '面积㎡', '金额', '状态', '凭证', ''];
 
   const row = (r) => isRent
     ? `<tr><td>${r.year}</td><td>${esc(r.period || '')}</td><td><b>${esc(r.dept || '')}</b></td>
-       <td>${esc(r.site || '')}</td><td class="num">${r.area ?? ''}</td><td class="num">${r.rate ?? ''}</td>
+       <td><span class="tag ${r.fee_type === '房租' ? 'accent' : ''}">${esc(r.fee_type)}</span></td>
+       <td class="num">${r.area ?? ''}</td><td class="num">${r.rate ?? '<span class="muted" title="按院区分档，综合单价见备注">分档</span>'}</td>
        <td class="num">${money(r.amount)}</td><td>${stateTag(r.state)}</td>
        <td>${esc(r.confirm_date || '')}</td><td>${esc(r.alloc_date || '')}</td>
        <td class="actions"><button class="btn link sm" data-e="${r.id}">编辑</button></td></tr>`
