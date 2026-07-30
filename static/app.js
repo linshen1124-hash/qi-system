@@ -357,7 +357,7 @@ const MODULES = {
     ],
   },
   housing: {
-    title: '职工住房', table: 'housing', icon: '🏠',
+    title: '公有住房', table: 'housing', icon: '🏠',
     columns: [['campus', '院区/地址'], ['room_no', '房间'], ['name', '住户'], ['dept', '部门'], ['area', '面积㎡', 'num'], ['rent_month', '月租', 'num'], ['fee_year', '年缴费', 'money'], ['status', '状态', 'status']],
     fields: [
       F('campus', '院区/地址(门楼胡同3号/单身宿舍...)'),
@@ -440,17 +440,75 @@ const MODULES = {
     ],
     attach: 1,
   },
+  lease: {
+    title: '租赁管理', table: 'lease', icon: '🤝',
+    hint: '出租与租入合为一表，以「方向」区分——两者字段几乎一致，差别只在院是出租方还是承租方。',
+    columns: [
+      ['direction', '方向'], ['counterparty', '对方单位'], ['cp_relation', '关系'],
+      ['site', '房屋'], ['area', '面积㎡', 'num'], ['total_year', '年合计', 'money'],
+      ['end_date', '到期日', 'expire'], ['state', '状态', 'status'],
+    ],
+    fields: [
+      F('direction', '方向', { type: 'select', req: 1, options: ['出租', '租入'] }),
+      F('counterparty', '对方单位', { req: 1, full: 1 }),
+      F('cp_type', '对方单位性质'),
+      F('cp_relation', '关联关系', { type: 'select', options: ['院属公司', '上级机关', '外部单位'] }),
+      F('property_id', '关联房产', { type: 'ref', ref: 'property', show: 'building', full: 1 }),
+      F('site', '房屋位置', { full: 1 }), F('room_no', '房号'),
+      F('area', '面积(㎡)', { type: 'number' }),
+      F('purpose', '用途', { type: 'select', options: ['办公', '宿舍', '其他'] }),
+      F('start_date', '起始日', { type: 'date' }), F('end_date', '到期日', { type: 'date' }),
+      F('rent_year', '年租金(元)', { type: 'number' }),
+      F('fee_year', '年物业费(元)', { type: 'number' }),
+      F('total_year', '年合计(元)', { type: 'number' }),
+      F('pay_cycle', '付款周期', { type: 'select', options: ['年', '半年', '季', '月', '一次性'], def: '年' }),
+      F('pay_date', '收/付款时间约定'),
+      F('contract_id', '关联合同', { type: 'ref', ref: 'contract', show: 'name', full: 1 }),
+      F('state', '状态', { type: 'select', def: '履行中', options: ['履行中', '即将到期', '已到期', '已续签', '已终止'] }),
+      F('notes', '备注', { full: 1 }),
+    ],
+    attach: 1,
+  },
+  repair: {
+    title: '修缮工程', table: 'repair', icon: '🔧',
+    hint: '按工程立项管理，走 立项→预算→采购→施工→验收→决算。属节能项目的请勾选标记，避免与节能模块重复记账。',
+    columns: [
+      ['name', '工程名称'], ['category', '类别'], ['site', '位置'],
+      ['stage', '阶段', 'status'], ['budget', '预算', 'money'],
+      ['amount', '合同金额', 'money'], ['final_amount', '决算', 'money'],
+    ],
+    fields: [
+      F('name', '工程名称', { req: 1, full: 1 }),
+      F('category', '类别', { type: 'select', options: ['装修改造', '维修保养', '节能改造', '老旧小区整治', '消防设施', '其他'] }),
+      F('is_energy', '同时属节能项目', { type: 'bool' }),
+      F('property_id', '关联房产', { type: 'ref', ref: 'property', show: 'building', full: 1 }),
+      F('site', '位置', { full: 1 }),
+      F('stage', '阶段', { type: 'select', def: '立项', options: ['立项', '预算', '采购', '施工', '验收', '决算', '已完成', '已取消'] }),
+      F('apply_date', '立项/请示日期', { type: 'date' }),
+      F('budget', '预算(元)', { type: 'number' }),
+      F('amount', '合同金额(元)', { type: 'number' }),
+      F('final_amount', '决算金额(元)', { type: 'number' }),
+      F('contractor', '施工单位'), F('owner', '承办人'),
+      F('start_date', '开工日', { type: 'date' }), F('end_date', '完工日', { type: 'date' }),
+      F('accept_date', '验收日', { type: 'date' }),
+      F('contract_id', '关联合同', { type: 'ref', ref: 'contract', show: 'name', full: 1 }),
+      F('source_file', '原件路径', { full: 1 }),
+      F('notes', '备注', { full: 1 }),
+    ],
+    attach: 1,
+  },
   // 幢（子）。挂在房产证下面，也允许 cert_id 为空——未登记建筑就是这种。
   property: {
     title: '幢/楼明细', table: 'property', icon: '🏛️',
     hint: '一栋建筑一条。证载面积与实际面积分列：两者在源数据里普遍不符（改扩建、拆除、未测绘），合并会丢掉核对线索。未挂靠任何房产证的即未登记建筑。',
     columns: [
-      ['campus', '院区'], ['building', '楼号/名称'], ['usage_type', '用途分类'],
+      ['tenure', '权属'], ['campus', '院区'], ['building', '楼号/名称'], ['usage_type', '用途分类'],
       ['cert_building_no', '证载栋号'], ['cert_area', '证载面积㎡', 'num'],
       ['actual_area', '实际面积㎡', 'num'], ['floors', '层数'], ['built_year', '建成年代'],
     ],
     fields: [
-      F('cert_id', '所属房产证', { type: 'ref', ref: 'property_cert', show: 'cert_no', full: 1 }),
+      F('tenure', '权属来源', { type: 'select', req: 1, def: '自有', options: ['自有', '租入', '借用代管'] }),
+      F('cert_id', '所属房产证（自有填）', { type: 'ref', ref: 'property_cert', show: 'cert_no', full: 1 }),
       F('campus', '院区', { type: 'select', req: 1, options: ['安定门院区', '亦庄院区', '万寿路27号院', '青龙胡同35号院', '门楼胡同3号院', '鼓楼东大街24号院', '苏州新扬产业园', '其他'] }),
       F('building', '楼号及名称（如 1号科研楼 / A座科研楼）', { req: 1 }),
       F('address', '坐落位置', { full: 1 }),
@@ -538,7 +596,14 @@ const MODULES = {
 
 const NAV = [
   { group: '总览', items: [['dashboard', '工作台', 'Dashboard', 'dashboard'], ['fee_bill', '费用缴纳', 'Fees', 'fee']] },
-  { group: '房屋管理', items: [['room', '用房分配', 'Rooms', 'room'], ['property', '房产明细', 'Properties', 'home'], ['property_fee', '物业费收支', 'Property Fees', 'fee']] },
+  // 按"权→用→事→钱"排：先有房（台账），再分配（使用），再签约/施工（事务），最后算账
+  { group: '房屋管理', items: [
+    ['property', '房产台账', 'Properties', 'home'],
+    ['room', '用房分配', 'Rooms', 'room'],
+    ['lease', '租赁管理', 'Leases', 'contract'],
+    ['repair', '修缮工程', 'Repairs', 'asset'],
+    ['property_fee', '物业费收支', 'Property Fees', 'fee'],
+  ] },
   { group: '车辆与司机', items: [['trip_record', '行车记录', 'Trip Records', 'trip'], ['subsidy', '司机补助', 'Subsidies', 'subsidy'], ['driver', '司机档案', 'Drivers', 'driver'], ['vehicle', '车辆档案', 'Vehicles', 'vehicle']] },
   // 采购台账 → 合同管理 → 固定资产，按"采购—签约—形成资产"的实际流程排
   { group: '采购与资产', items: [['procurement', '采购台账', 'Procurement', 'cart'], ['contract', '合同管理', 'Contracts', 'contract'], ['asset', '固定资产', 'Assets', 'asset']] },
@@ -550,7 +615,7 @@ const NAV = [
 
 const KICKER = {
   dashboard: 'OVERVIEW', trip_record: 'TRIP RECORDS', subsidy: 'DRIVER SUBSIDIES',
-  driver: 'DRIVERS', vehicle: 'VEHICLES', room: 'ROOM ALLOCATION', property: 'PROPERTIES',
+  driver: 'DRIVERS', vehicle: 'VEHICLES', room: 'ROOM ALLOCATION', property: 'PROPERTIES', lease: 'LEASES', repair: 'REPAIRS',
   contract: 'CONTRACTS', fee_bill: 'FEES', todo: 'TASKS', settings: 'SETTINGS',
   energy_summary: 'ENERGY SUMMARY', energy_reading: 'ENERGY LEDGER', energy_activity: 'ENERGY PROGRAMS',
   procurement: 'PROCUREMENT', asset: 'FIXED ASSETS',
@@ -617,7 +682,7 @@ async function viewDashboard() {
   const cards = [
     ['在岗司机', c.driver, '人', 'driver', 'var(--neon)'], ['在用车辆', c.vehicle, '辆', 'vehicle', 'var(--neon-2)'],
     ['行车记录', c.trip, '条', 'trip', 'var(--orange)'], ['登记用房', c.room, '间', 'room', 'var(--surface-dim)'],
-    ['房产明细', c.property, '栋', 'home', 'var(--neon-2)'], ['在住职工', c.housing, '户', 'home', 'var(--purple-deep)'],
+    ['房产明细', c.property, '栋', 'home', 'var(--neon-2)'], ['公房承租', c.housing, '户', 'home', 'var(--purple-deep)'],
     ['在执行合同', c.contract, '份', 'contract', 'var(--warn)'],
     ['在办采购', c.procurement, '项', 'cart', 'var(--orange)'], ['在用资产', c.asset, '项', 'asset', 'var(--surface-dim)'],
     ['在册职工', c.staff, '人', 'people', 'var(--neon)'],
@@ -855,7 +920,7 @@ function stateTag(s) {
 
 /* ---------- 房产明细：房产证 → 幢 两级 ---------- */
 async function viewProperty() {
-  setTitle('property', '房产明细');
+  setTitle('property', '房产台账');
   const actions = $('#topbar-actions'); actions.innerHTML = '';
   const addCert = el(`<button class="btn">${icon('plus')}新增房产证</button>`);
   addCert.onclick = () => openForm('property_cert', null);
@@ -870,7 +935,9 @@ async function viewProperty() {
 
   const n2 = (v) => v == null ? '' : Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
   const under = (cid) => (blds || []).filter(b => b.cert_id == cid);
-  const orphans = (blds || []).filter(b => !b.cert_id);
+  // 租入/借用的房子本来就没有我方权证，不能和"自有但漏挂证"混在一组
+  const rented = (blds || []).filter(b => b.tenure && b.tenure !== '自有');
+  const orphans = (blds || []).filter(b => !b.cert_id && (!b.tenure || b.tenure === '自有'));
 
   // 子表：一本证名下的各幢
   const detail = (list, cert) => {
@@ -880,18 +947,20 @@ async function viewProperty() {
     // 证载合计与各幢证载之和应当相等，不等就是漏挂或错挂
     const gap = cert ? (cert.building_area || 0) - sumC : 0;
     return `<table class="sub"><thead><tr>
-        <th>楼号/名称</th><th>用途</th><th>证载栋号</th>
+        <th>楼号/名称</th><th>权属</th><th>用途</th><th>证载栋号</th>
         <th class="num">证载㎡</th><th class="num">实际㎡</th>
         <th>层数</th><th>建成</th><th></th></tr></thead><tbody>
       ${list.map(b => `<tr>
-        <td><b>${esc(b.building)}</b></td><td class="muted">${esc(b.usage_type || '')}</td>
+        <td><b>${esc(b.building)}</b></td>
+        <td><span class="tag ${b.tenure === '自有' ? '' : 'ct-land'}">${esc(b.tenure || '自有')}</span></td>
+        <td class="muted">${esc(b.usage_type || '')}</td>
         <td>${esc(b.cert_building_no || '')}</td>
         <td class="num">${n2(b.cert_area)}</td>
         <td class="num">${n2(b.actual_area)}</td>
         <td>${esc(b.floors || '')}</td><td>${esc(b.built_year || '')}</td>
         <td class="actions"><button class="btn link sm" data-edit-b="${b.id}">编辑</button></td></tr>`).join('')}
       <tr style="background:var(--surface-dim);font-weight:700">
-        <td colspan="3">小计 ${list.length} 幢</td>
+        <td colspan="4">小计 ${list.length} 幢</td>
         <td class="num">${n2(sumC)}</td><td class="num">${n2(sumA)}</td>
         <td colspan="3">${cert && Math.abs(gap) > 0.01
           ? `<span class="tag danger">与证载差 ${n2(gap)}㎡</span>`
@@ -953,6 +1022,7 @@ async function viewProperty() {
     <div class="mini-cards">
       <div class="mini-card"><div class="mk-k">权证</div><div class="mk-v">${(certs || []).length}<small> 本</small></div></div>
       <div class="mini-card"><div class="mk-k">幢/楼</div><div class="mk-v">${(blds || []).length}<small> 栋</small></div></div>
+      <div class="mini-card"><div class="mk-k">其中·租入借用</div><div class="mk-v">${rented.length}<small> 处</small></div></div>
       <div class="mini-card"><div class="mk-k">证载建筑面积</div><div class="mk-v">${n2(Math.round(totalCert))}<small> ㎡</small></div></div>
       <div class="mini-card"><div class="mk-k">实际建筑面积</div><div class="mk-v">${n2(Math.round(totalActual))}<small> ㎡</small></div></div>
       <div class="mini-card"><div class="mk-k">未登记面积</div><div class="mk-v">${n2(Math.round(totalActual - totalCert))}<small> ㎡</small></div></div>
@@ -965,15 +1035,27 @@ async function viewProperty() {
       </span>
     </div>
     ${(certs || []).map(certRow).join('')}
+    ${rented.length ? `
+      <div class="panel" style="margin-bottom:14px">
+        <div class="panel-h" style="cursor:pointer" data-toggle="rent">
+          <h2 style="font-size:15px"><span class="ic">${icon('home')}</span>租入 / 借用代管
+            <span class="tag ct-land">${rented.length} 处</span></h2>
+          <span class="caret" id="caret-rent">▸</span>
+        </div>
+        <div class="panel-b" id="body-rent" hidden>
+          <div class="hint" style="margin:12px">这些房屋不属我方产权，本就没有我方权证，租约见「租赁管理」。</div>
+          <div style="overflow-x:auto">${detail(rented, null)}</div>
+        </div>
+      </div>` : ''}
     ${orphans.length ? `
       <div class="panel" style="margin-bottom:14px">
         <div class="panel-h" style="cursor:pointer" data-toggle="none">
-          <h2 style="font-size:15px"><span class="ic">${icon('home')}</span>未挂靠任何房产证
+          <h2 style="font-size:15px"><span class="ic">${icon('home')}</span>自有但未挂权证
             <span class="tag warn">${orphans.length} 幢</span></h2>
           <span class="caret" id="caret-none">▸</span>
         </div>
         <div class="panel-b" id="body-none" hidden>
-          <div class="hint" style="margin:12px">这些建筑证载面积为空，属未办理权属登记的部分。</div>
+          <div class="hint" style="margin:12px">自有产权但证载面积为空，属未办理权属登记的部分。</div>
           <div style="overflow-x:auto">${detail(orphans, null)}</div>
         </div>
       </div>` : ''}`;
@@ -999,7 +1081,7 @@ async function viewRoomAlloc() {
   viewRoomAlloc._sub = sub;
 
   // 三个 sheet 各自对应不同的新增目标
-  const ADD = { office: ['room', '用房'], dorm: ['dorm', '床位'], housing: ['housing', '住户'] };
+  const ADD = { office: ['room', '用房'], dorm: ['dorm', '床位'], housing: ['housing', '承租户'] };
   const [addKey, addLabel] = ADD[sub];
   const actions = $('#topbar-actions'); actions.innerHTML = '';
   const addBtn = el(`<button class="btn primary">${icon('plus')}新增${addLabel}</button>`);
@@ -1009,7 +1091,7 @@ async function viewRoomAlloc() {
   const view = $('#view');
   const tab = (k, label) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${label}</button>`;
   view.innerHTML = `
-    <div class="segbar">${tab('office', '🏢 办公用房')}${tab('dorm', '🛏️ 宿舍用房')}${tab('housing', '🏠 职工住房')}</div>
+    <div class="segbar">${tab('office', '🏢 办公用房')}${tab('dorm', '🛏️ 单身宿舍')}${tab('housing', '🏠 公有住房')}</div>
     <div id="ra-body"><div class="empty">加载中…</div></div>`;
   view.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => { viewRoomAlloc._sub = b.dataset.sub; viewRoomAlloc(); });
 
