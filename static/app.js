@@ -405,6 +405,41 @@ const MODULES = {
     ],
     attach: 1,
   },
+  // 物业费收支。一条记录=一笔交易，记付款方与收款方两端；
+  // 赛西→院这类既是赛西收入又是院支出，一条即可，不必两边各录。
+  property_fee: {
+    title: '物业管理费收支', table: 'property_fee', icon: '💰',
+    columns: [
+      ['year', '年度'], ['biz_line', '业务线'], ['payer', '付款方'], ['payee', '收款方'],
+      ['fee_type', '费用类型'], ['site', '房屋/场所'], ['amount', '金额', 'money'],
+      ['settle_mode', '结算方式'], ['state', '状态', 'status'],
+    ],
+    fields: [
+      F('biz_line', '业务线', {
+        type: 'select', req: 1,
+        options: ['赛西产业向院收取物业费', '院向部机关缴费', '院向外部物业缴费', '院向内部部门收房租'],
+      }),
+      F('year', '年度', { type: 'number', req: 1, def: new Date().getFullYear() }),
+      F('period', '期间（年度/上半年/2025-03 等）'),
+      F('payer', '付款方', { req: 1 }),
+      F('payee', '收款方', { req: 1 }),
+      F('fee_type', '费用类型', { type: 'select', req: 1, options: ['物业管理费', '水费', '电费', '取暖费', '房租', '其他'] }),
+      F('settle_mode', '结算方式', { type: 'select', options: ['实际收付', '内部记账'], def: '实际收付' }),
+      F('site', '房屋/场所（如 万寿路27号院 / 南湖中园 / 中雅大厦）', { full: 1 }),
+      F('property_id', '关联房产明细', { type: 'ref', ref: 'property', show: 'building', full: 1 }),
+      F('dept', '被征收部门（内部房租填）'),
+      F('area', '计费面积(㎡)', { type: 'number' }),
+      F('rate', '计费标准(元/㎡·年)', { type: 'number' }),
+      F('amount', '金额(元)', { type: 'number', req: 1 }),
+      F('state', '状态', { type: 'select', def: '待处理', options: ['待处理', '已开票', '已收付', '已结清', '待确认', '已确认', '已分摊'] }),
+      F('confirm_date', '部门确认日（内部房租）', { type: 'date' }),
+      F('alloc_date', '财务分摊日（内部房租）', { type: 'date' }),
+      F('contract_id', '关联合同', { type: 'ref', ref: 'contract', show: 'name', full: 1 }),
+      F('voucher', '凭证号/发票号'),
+      F('notes', '备注', { full: 1 }),
+    ],
+    attach: 1,
+  },
   // 幢（子）。挂在房产证下面，也允许 cert_id 为空——未登记建筑就是这种。
   property: {
     title: '幢/楼明细', table: 'property', icon: '🏛️',
@@ -503,7 +538,7 @@ const MODULES = {
 
 const NAV = [
   { group: '总览', items: [['dashboard', '工作台', 'Dashboard', 'dashboard'], ['fee_bill', '费用缴纳', 'Fees', 'fee']] },
-  { group: '房屋管理', items: [['room', '用房分配', 'Rooms', 'room'], ['property', '房产明细', 'Properties', 'home']] },
+  { group: '房屋管理', items: [['room', '用房分配', 'Rooms', 'room'], ['property', '房产明细', 'Properties', 'home'], ['property_fee', '物业费收支', 'Property Fees', 'fee']] },
   { group: '车辆与司机', items: [['trip_record', '行车记录', 'Trip Records', 'trip'], ['subsidy', '司机补助', 'Subsidies', 'subsidy'], ['driver', '司机档案', 'Drivers', 'driver'], ['vehicle', '车辆档案', 'Vehicles', 'vehicle']] },
   // 采购台账 → 合同管理 → 固定资产，按"采购—签约—形成资产"的实际流程排
   { group: '采购与资产', items: [['procurement', '采购台账', 'Procurement', 'cart'], ['contract', '合同管理', 'Contracts', 'contract'], ['asset', '固定资产', 'Assets', 'asset']] },
@@ -560,6 +595,7 @@ function route() {
   if (key === 'dashboard') return viewDashboard();
   if (key === 'room') return viewRoomAlloc();
   if (key === 'property') return viewProperty();
+  if (key === 'property_fee') return viewPropertyFee();
   if (key === 'subsidy') return viewSubsidy();
   if (key === 'energy_summary') return viewEnergySummary();
   if (key === 'obligations') return viewObligations();
@@ -653,6 +689,166 @@ td.lbl{width:110px;background:#f5f5f5;text-align:center;white-space:nowrap}
 <div class="sign"><div>部门负责人：___________</div><div>经办人：___________</div></div>
 </div></body></html>`);
   w.document.close();
+}
+
+/* ---------- 物业管理费收支 ---------- */
+const PF_LINES = [
+  { key: '赛西产业向院收取物业费', short: '赛西→院', icon: '🏢',
+    desc: '赛西产业承接院物业服务、管理院自有产权房屋，每年固定向上级单位征收。对赛西是收入，对院是支出。' },
+  { key: '院向部机关缴费', short: '院→部机关', icon: '🏛️',
+    desc: '万寿路27号院房屋属部机关产权，我院使用并缴纳物业费、水费、电费。' },
+  { key: '院向外部物业缴费', short: '院→外部物业', icon: '🏘️',
+    desc: '南湖中园、中雅大厦等院自有产权房屋由外部物业公司管理，院向其缴纳物业费、水电费等。' },
+  { key: '院向内部部门收房租', short: '院→内部部门', icon: '📋', book: 1,
+    desc: '按标准向占用部门计收房租。内部记账、不走真实资金：计收 → 部门确认 → 交院财务处统一分摊成本。' },
+];
+const INSTITUTE = '中国电子技术标准化研究院';
+const SAIXI = '北京赛西科技产业有限责任公司';
+
+async function viewPropertyFee() {
+  setTitle('property_fee', '物业管理费收支');
+  const sub = viewPropertyFee._sub || 'overview';
+  viewPropertyFee._sub = sub;
+  const year = viewPropertyFee._year || new Date().getFullYear();
+  viewPropertyFee._year = year;
+
+  const actions = $('#topbar-actions'); actions.innerHTML = '';
+  const addBtn = el(`<button class="btn primary">${icon('plus')}新增收支</button>`);
+  addBtn.onclick = () => openForm('property_fee', null);
+  actions.appendChild(addBtn);
+
+  const view = $('#view');
+  const tab = (k, label) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${label}</button>`;
+  view.innerHTML = `
+    <div class="segbar">${tab('overview', '💰 收支总览')}${PF_LINES.map(l => tab(l.key, l.icon + ' ' + l.short)).join('')}</div>
+    <div id="pf-body"><div class="empty">加载中…</div></div>`;
+  view.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => { viewPropertyFee._sub = b.dataset.sub; viewPropertyFee(); });
+
+  const body = $('#pf-body');
+  const rows = (await api.get('/property_fee')) || [];
+  const years = [...new Set(rows.map(r => r.year))].sort((a, b) => b - a);
+
+  if (sub !== 'overview') return renderFeeLine(body, rows, sub);
+
+  const yr = rows.filter(r => r.year === year);
+  const sum = (f) => yr.filter(f).reduce((a, r) => a + (r.amount || 0), 0);
+  const inOf = (e) => sum(r => r.payee === e);
+  const outOf = (e) => sum(r => r.payer === e);
+  const wan = (v) => (v / 10000).toFixed(2);
+
+  // 主体卡：一条交易同时是一方的收入、另一方的支出，故按 payer/payee 双向统计
+  const entityCard = (name, alias) => {
+    const i = inOf(name), o = outOf(name);
+    const ib = sum(r => r.payee === name && r.settle_mode === '内部记账');
+    const ob = sum(r => r.payer === name && r.settle_mode === '内部记账');
+    return `<div class="panel" style="margin:0">
+      <div class="panel-h"><h2 style="font-size:15px">${esc(alias)}</h2>
+        <span class="tag ${i - o >= 0 ? 'ok' : 'danger'}">净 ${wan(i - o)} 万</span></div>
+      <div class="panel-b" style="padding:14px 18px">
+        <div class="pf-kv"><span>收入</span><b>${wan(i)} 万</b></div>
+        ${ib ? `<div class="pf-kv sub"><span>其中·内部记账</span><span>${wan(ib)} 万</span></div>` : ''}
+        <div class="pf-kv"><span>支出</span><b>${wan(o)} 万</b></div>
+        ${ob ? `<div class="pf-kv sub"><span>其中·内部记账</span><span>${wan(ob)} 万</span></div>` : ''}
+      </div></div>`;
+  };
+
+  const lineStat = PF_LINES.map(l => {
+    const rs = yr.filter(r => r.biz_line === l.key);
+    const amt = rs.reduce((a, r) => a + (r.amount || 0), 0);
+    const pend = rs.filter(r => !['已结清', '已收付', '已分摊'].includes(r.state)).length;
+    // 内部记账是这条业务线的固有性质，不能从有没有数据来推
+    return { ...l, cnt: rs.length, amt, pend };
+  });
+
+  body.innerHTML = `
+    <div class="toolbar">
+      <label class="hint" style="margin:0">年度</label>
+      <select id="pf-year" style="width:120px">
+        ${(years.length ? years : [year]).map(y => `<option ${y === year ? 'selected' : ''}>${y}</option>`).join('')}
+      </select>
+      <div class="spacer"></div>
+      <span class="hint" style="margin:0">${yr.length} 笔</span>
+    </div>
+
+    <div class="pf-entities">
+      ${entityCard(INSTITUTE, '中国电子技术标准化研究院')}
+      ${entityCard(SAIXI, '北京赛西科技产业有限责任公司')}
+    </div>
+
+    <div class="panel">
+      <div class="panel-h"><h2>资金流向</h2><span class="hint" style="margin:0">${year} 年度</span></div>
+      <div class="panel-b" style="padding:18px 20px">
+        <div class="pf-flow">
+          ${lineStat.map(l => `
+            <div class="pf-flow-row ${l.book ? 'book' : ''}" data-goto="${esc(l.key)}">
+              <span class="pf-ico">${l.icon}</span>
+              <span class="pf-line">${esc(l.short)}
+                ${l.book ? '<span class="tag warn">内部记账</span>' : ''}
+                ${l.pend ? `<span class="tag danger">${l.pend} 笔未结</span>` : ''}
+              </span>
+              <span class="pf-amt">${l.cnt ? wan(l.amt) + ' 万' : '<span class="muted">暂无数据</span>'}</span>
+              <span class="pf-desc muted">${esc(l.desc)}</span>
+            </div>`).join('')}
+        </div>
+        <div class="hint" style="margin:16px 0 0">
+          「内部记账」不走真实资金：按标准计收后需经被征收部门确认，再交院财务处统一分摊成本，
+          故它同时计入院的收入与部门的成本，对院的现金流为零。
+        </div>
+      </div>
+    </div>`;
+
+  body.querySelector('#pf-year').onchange = (e) => {
+    viewPropertyFee._year = parseInt(e.target.value); viewPropertyFee();
+  };
+  body.querySelectorAll('[data-goto]').forEach(r => r.onclick = () => {
+    viewPropertyFee._sub = r.dataset.goto; viewPropertyFee();
+  });
+}
+
+function renderFeeLine(body, rows, line) {
+  const meta = PF_LINES.find(l => l.key === line);
+  const list = rows.filter(r => r.biz_line === line)
+    .sort((a, b) => (b.year - a.year) || a.id - b.id);
+  const wan = (v) => (v / 10000).toFixed(2);
+  const isRent = line === '院向内部部门收房租';
+  const total = list.reduce((a, r) => a + (r.amount || 0), 0);
+
+  const head = isRent
+    ? ['年度', '期间', '部门', '房屋/场所', '面积㎡', '标准', '金额', '状态', '确认日', '分摊日', '']
+    : ['年度', '期间', '付款方', '收款方', '费用类型', '房屋/场所', '面积㎡', '金额', '状态', '凭证', ''];
+
+  const row = (r) => isRent
+    ? `<tr><td>${r.year}</td><td>${esc(r.period || '')}</td><td><b>${esc(r.dept || '')}</b></td>
+       <td>${esc(r.site || '')}</td><td class="num">${r.area ?? ''}</td><td class="num">${r.rate ?? ''}</td>
+       <td class="num">${money(r.amount)}</td><td>${stateTag(r.state)}</td>
+       <td>${esc(r.confirm_date || '')}</td><td>${esc(r.alloc_date || '')}</td>
+       <td class="actions"><button class="btn link sm" data-e="${r.id}">编辑</button></td></tr>`
+    : `<tr><td>${r.year}</td><td>${esc(r.period || '')}</td><td>${esc(r.payer)}</td>
+       <td>${esc(r.payee)}</td><td>${esc(r.fee_type)}</td><td>${esc(r.site || '')}</td>
+       <td class="num">${r.area ?? ''}</td><td class="num">${money(r.amount)}</td>
+       <td>${stateTag(r.state)}</td><td class="muted">${esc(r.voucher || '')}</td>
+       <td class="actions"><button class="btn link sm" data-e="${r.id}">编辑</button></td></tr>`;
+
+  body.innerHTML = `
+    <div class="hint">${esc(meta.desc)}</div>
+    <div class="panel">
+      <div class="panel-h"><h2>${meta.icon} ${esc(meta.short)}</h2>
+        <span>${list.length} 笔 · 合计 <b>${wan(total)}</b> 万元</span></div>
+      <div class="panel-b"><div style="overflow-x:auto"><table>
+        <thead><tr>${head.map((h, i) => `<th class="${i >= 4 && i <= 7 ? 'num' : ''}">${h}</th>`).join('')}</tr></thead>
+        <tbody>${list.length ? list.map(row).join('')
+          : `<tr><td colspan="${head.length}"><div class="empty">暂无记录，点击右上角"新增收支"录入</div></td></tr>`}</tbody>
+      </table></div></div>
+    </div>`;
+  body.querySelectorAll('[data-e]').forEach(b => b.onclick = () =>
+    openForm('property_fee', rows.find(r => r.id == b.dataset.e)));
+}
+
+function stateTag(s) {
+  const done = ['已结清', '已收付', '已分摊'];
+  const mid = ['已开票', '已确认'];
+  const cls = done.includes(s) ? 'ok' : (mid.includes(s) ? 'accent' : 'warn');
+  return `<span class="tag ${cls}">${esc(s || '')}</span>`;
 }
 
 /* ---------- 房产明细：房产证 → 幢 两级 ---------- */
