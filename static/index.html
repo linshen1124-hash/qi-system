@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>QI SYSTEM · 后勤管理</title>
 <!-- ?v= 是缓存失效开关：_headers 给 js/css 设了 max-age=86400，
-     不换 URL 的话 CDN 会继续发旧文件，改完代码务必把版本号 +1 -->
-<link rel="stylesheet" href="/style.css?v=10">
+     不换 URL 的话 CDN 会继续发旧文件，改完代码务必把版本号 +1。
+     ⚠️ 部署后必须用随机串绕缓存核对源站是否已更新，再核对 ?v= 这个 URL。
+     index.html 是 no-cache、js/css 是 24h，两者传播有先后；若在源站尚未更新的
+     窗口内有人请求了新版本号，边缘会把旧文件缓存到新 URL 下，锁死 24 小时。
+     出现这种情况只能再升一位版本号（换一个从未被缓存过的 key）。 -->
+<link rel="stylesheet" href="/style.css?v=11">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -44,6 +48,6 @@
 <div id="modal-root"></div>
 <div id="toast"></div>
 
-<script src="/app.js?v=10"></script>
+<script src="/app.js?v=11"></script>
 </body>
 </html>
