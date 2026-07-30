@@ -502,16 +502,15 @@ const MODULES = {
 };
 
 const NAV = [
-  { group: '总览', items: [['dashboard', '工作台', 'Dashboard', 'dashboard']] },
-  { group: '采购与资产', items: [['procurement', '采购台账', 'Procurement', 'cart'], ['asset', '固定资产', 'Assets', 'asset']] },
-  { group: '合同与费用', items: [['contract', '合同管理', 'Contracts', 'contract'], ['fee_bill', '费用缴纳', 'Fees', 'fee']] },
-  { group: '车辆与司机', items: [['trip_record', '行车记录', 'Trip Records', 'trip'], ['subsidy', '司机补助', 'Subsidies', 'subsidy'], ['driver', '司机档案', 'Drivers', 'driver'], ['vehicle', '车辆档案', 'Vehicles', 'vehicle']] },
+  { group: '总览', items: [['dashboard', '工作台', 'Dashboard', 'dashboard'], ['fee_bill', '费用缴纳', 'Fees', 'fee']] },
   { group: '房屋管理', items: [['room', '用房分配', 'Rooms', 'room'], ['property', '房产明细', 'Properties', 'home']] },
+  { group: '车辆与司机', items: [['trip_record', '行车记录', 'Trip Records', 'trip'], ['subsidy', '司机补助', 'Subsidies', 'subsidy'], ['driver', '司机档案', 'Drivers', 'driver'], ['vehicle', '车辆档案', 'Vehicles', 'vehicle']] },
+  // 采购台账 → 合同管理 → 固定资产，按"采购—签约—形成资产"的实际流程排
+  { group: '采购与资产', items: [['procurement', '采购台账', 'Procurement', 'cart'], ['contract', '合同管理', 'Contracts', 'contract'], ['asset', '固定资产', 'Assets', 'asset']] },
   { group: '节能管理', items: [['energy_summary', '能耗汇总', 'Energy Summary', 'energy'], ['energy_reading', '能耗台账', 'Energy Ledger', 'energy'], ['energy_activity', '节能宣传', 'Energy Programs', 'megaphone']] },
   { group: '人事工会', items: [['staff', '职工花名册', 'Staff', 'people'], ['welfare', '福利发放', 'Welfare', 'gift']] },
-  { group: '宣传报道', items: [['publicity', '宣传报道', 'Publicity', 'news']] },
   { group: '规则与制度', items: [['obligations', '合规义务', 'Obligations', 'scale'], ['rule', '规则库', 'Rules', 'scale'], ['rule_source', '制度依据库', 'Rule Sources', 'book'], ['audit', '审计日志', 'Audit Log', 'todo']] },
-  { group: '综合事务', items: [['archive_index', '档案索引', 'Archive', 'book'], ['todo', '待办事项', 'Tasks', 'todo'], ['settings', '系统设置', 'Settings', 'settings']] },
+  { group: '综合事务', items: [['archive_index', '档案索引', 'Archive', 'book'], ['publicity', '宣传报道', 'Publicity', 'news'], ['todo', '待办事项', 'Tasks', 'todo'], ['settings', '系统设置', 'Settings', 'settings']] },
 ];
 
 const KICKER = {
