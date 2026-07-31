@@ -86,6 +86,14 @@ const api = {
     const { parts, params } = parsePath(path);
     const t = parts[0];
 
+    // 总账等分析型函数直接透传 rpc，避免为每个函数写一条分支
+    if (t === 'rpc') {
+      const fn = parts[1];
+      const args = {};
+      for (const [k, v] of Object.entries(params)) args[k] = /^-?\d+$/.test(v) ? parseInt(v) : v;
+      const { data } = await sb.rpc(fn, args);
+      return data;
+    }
     if (t === 'dashboard') { const { data } = await sb.rpc('get_dashboard'); return data; }
     if (t === 'settings') { const { data } = await sb.from('setting').select('*'); return Object.fromEntries((data || []).map(r => [r.key, r.value])); }
     if (t === 'subsidy') { const { data } = await sb.rpc('list_subsidy', { p_year: parseInt(params.year), p_month: parseInt(params.month) }); return data; }
@@ -622,13 +630,12 @@ const MODULES = {
 
 const NAV = [
   { group: '总览', items: [['dashboard', '工作台', 'Dashboard', 'dashboard'], ['fee_bill', '费用缴纳', 'Fees', 'fee']] },
-  // 按"权→用→事→钱"排：先有房（台账），再分配（使用），再签约/施工（事务），最后算账
+  // 严格四层：权（房子是谁的、租约如何）→ 用（谁在用）→ 事（对房子做了什么）→ 收支
   { group: '房屋管理', items: [
-    ['property', '房产台账', 'Properties', 'home'],
-    ['room', '用房分配', 'Rooms', 'room'],
-    ['lease', '租赁管理', 'Leases', 'contract'],
-    ['repair', '修缮工程', 'Repairs', 'asset'],
-    ['property_fee', '物业费收支', 'Property Fees', 'fee'],
+    ['property', '房产权属', 'Ownership', 'home'],
+    ['room', '用房分配', 'Allocation', 'room'],
+    ['repair', '房屋事务', 'Affairs', 'asset'],
+    ['property_fee', '房屋收支', 'Ledger', 'fee'],
   ] },
   { group: '车辆与司机', items: [['trip_record', '行车记录', 'Trip Records', 'trip'], ['subsidy', '司机补助', 'Subsidies', 'subsidy'], ['driver', '司机档案', 'Drivers', 'driver'], ['vehicle', '车辆档案', 'Vehicles', 'vehicle']] },
   // 采购台账 → 合同管理 → 固定资产，按"采购—签约—形成资产"的实际流程排
@@ -686,7 +693,8 @@ function route() {
   if (key === 'dashboard') return viewDashboard();
   if (key === 'room') return viewRoomAlloc();
   if (key === 'property') return viewProperty();
-  if (key === 'property_fee') return viewPropertyFee();
+  if (key === 'property_fee') return viewLedger();
+  if (key === 'repair') return viewRepair();
   if (key === 'subsidy') return viewSubsidy();
   if (key === 'energy_summary') return viewEnergySummary();
   if (key === 'obligations') return viewObligations();
@@ -782,167 +790,200 @@ td.lbl{width:110px;background:#f5f5f5;text-align:center;white-space:nowrap}
   w.document.close();
 }
 
-/* ---------- 物业管理费收支 ---------- */
-const PF_LINES = [
-  { key: '赛西产业向院收取物业费', short: '赛西→院', icon: '🏢',
-    desc: '赛西产业承接院物业服务、管理院自有产权房屋，每年固定向上级单位征收。对赛西是收入，对院是支出。' },
-  { key: '院向部机关缴费', short: '院→部机关', icon: '🏛️',
-    desc: '万寿路27号院房屋属部机关产权，我院使用并缴纳物业费、水费、电费。' },
-  { key: '院向外部物业缴费', short: '院→外部物业', icon: '🏘️',
-    desc: '南湖中园、中雅大厦等院自有产权房屋由外部物业公司管理，院向其缴纳物业费、水电费等。' },
-];
-// 内部房租已迁往「用房分配 · 部门用房」——它本质是分配而非对外收付。
-const INSTITUTE = '中国电子技术标准化研究院';
-const SAIXI = '北京赛西科技产业有限责任公司';
-
-async function viewPropertyFee() {
-  setTitle('property_fee', '物业管理费收支');
-  const sub = viewPropertyFee._sub || 'overview';
-  viewPropertyFee._sub = sub;
-  const year = viewPropertyFee._year || new Date().getFullYear();
-  viewPropertyFee._year = year;
-
+/* 事层：对房子做了什么。目前只有修缮工程，留出扩位（巡检、验收等）。 */
+async function viewRepair() {
+  setTitle('repair', '房屋事务');
   const actions = $('#topbar-actions'); actions.innerHTML = '';
-  const addBtn = el(`<button class="btn primary">${icon('plus')}新增收支</button>`);
-  addBtn.onclick = () => openForm('property_fee', null);
-  actions.appendChild(addBtn);
+  const b = el(`<button class="btn primary">${icon('plus')}新增工程</button>`);
+  b.onclick = () => openForm('repair', null);
+  actions.appendChild(b);
 
   const view = $('#view');
-  const tab = (k, label) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${label}</button>`;
+  view.innerHTML = `<div class="segbar"><button class="seg-btn active">🔧 修缮工程</button></div>
+    <div id="rp-body"><div class="empty">加载中…</div></div>`;
+  await renderModuleTable('repair', $('#rp-body'));
+}
+
+/* 收支层：从五个来源汇总的总账。本模块不重复录数——
+   房租归租约、修缮款归工程、内部计收归分配，此处只做汇总与下钻。 */
+const LEDGER_SRC = {
+  '租赁': { icon: '🤝', goto: 'property' },
+  '物业费': { icon: '💰', goto: null },
+  '能耗': { icon: '⚡', goto: 'energy_reading' },
+  '修缮': { icon: '🔧', goto: 'repair' },
+  '内部分配': { icon: '📋', goto: 'room' },
+};
+
+async function viewLedger() {
+  setTitle('property_fee', '房屋收支');
+  const sub = viewLedger._sub || 'overview';
+  viewLedger._sub = sub;
+
+  const actions = $('#topbar-actions'); actions.innerHTML = '';
+  const b = el(`<button class="btn primary">${icon('plus')}新增对外收支</button>`);
+  b.onclick = () => openForm('property_fee', null);
+  actions.appendChild(b);
+
+  const view = $('#view');
+  const tab = (k, l) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${l}</button>`;
   view.innerHTML = `
-    <div class="segbar">${tab('overview', '💰 收支总览')}${PF_LINES.map(l => tab(l.key, l.icon + ' ' + l.short)).join('')}</div>
-    <div id="pf-body"><div class="empty">加载中…</div></div>`;
-  view.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => { viewPropertyFee._sub = b.dataset.sub; viewPropertyFee(); });
+    <div class="segbar">${tab('overview', '📊 年度总账')}${tab('detail', '📑 收支明细')}${tab('fee', '💰 对外收付台账')}</div>
+    <div id="lg-body"><div class="empty">加载中…</div></div>`;
+  view.querySelectorAll('[data-sub]').forEach(x => x.onclick = () => { viewLedger._sub = x.dataset.sub; viewLedger(); });
 
-  const body = $('#pf-body');
-  const rows = (await api.get('/property_fee')) || [];
-  const years = [...new Set(rows.map(r => r.year))].sort((a, b) => b - a);
+  const body = $('#lg-body');
+  if (sub === 'fee') return renderModuleTable('property_fee', body);
 
-  if (sub !== 'overview') return renderFeeLine(body, rows, sub);
+  const years = await api.get('/rpc/housing_ledger_by_year');
+  const yr = viewLedger._year || (years?.[0]?.year) || new Date().getFullYear();
+  viewLedger._year = yr;
 
-  const yr = rows.filter(r => r.year === year);
-  const sum = (f) => yr.filter(f).reduce((a, r) => a + (r.amount || 0), 0);
-  const inOf = (e) => sum(r => r.payee === e);
-  const outOf = (e) => sum(r => r.payer === e);
-  const wan = (v) => (v / 10000).toFixed(2);
+  if (sub === 'overview') return renderLedgerOverview(body, years, yr);
+  return renderLedgerDetail(body, yr);
+}
 
-  // 主体卡：一条交易同时是一方的收入、另一方的支出，故按 payer/payee 双向统计
-  const entityCard = (name, alias) => {
-    const i = inOf(name), o = outOf(name);
-    const ib = sum(r => r.payee === name && r.settle_mode === '内部记账');
-    const ob = sum(r => r.payer === name && r.settle_mode === '内部记账');
-    return `<div class="panel" style="margin:0">
-      <div class="panel-h"><h2 style="font-size:15px">${esc(alias)}</h2>
-        <span class="tag ${i - o >= 0 ? 'ok' : 'danger'}">净 ${wan(i - o)} 万</span></div>
-      <div class="panel-b" style="padding:14px 18px">
-        <div class="pf-kv"><span>收入</span><b>${wan(i)} 万</b></div>
-        ${ib ? `<div class="pf-kv sub"><span>其中·内部记账</span><span>${wan(ib)} 万</span></div>` : ''}
-        <div class="pf-kv"><span>支出</span><b>${wan(o)} 万</b></div>
-        ${ob ? `<div class="pf-kv sub"><span>其中·内部记账</span><span>${wan(ob)} 万</span></div>` : ''}
-      </div></div>`;
-  };
+const wan = (v) => (Number(v || 0) / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const lineStat = PF_LINES.map(l => {
-    const rs = yr.filter(r => r.biz_line === l.key);
-    const amt = rs.reduce((a, r) => a + (r.amount || 0), 0);
-    const pend = rs.filter(r => !['已结清', '已收付', '已分摊'].includes(r.state)).length;
-    // 内部记账是这条业务线的固有性质，不能从有没有数据来推
-    return { ...l, cnt: rs.length, amt, pend };
+async function renderLedgerOverview(body, years, yr) {
+  const rows = (await api.get(`/rpc/housing_ledger_summary?p_year=${yr}`)) || [];
+  const cur = (years || []).find(y => y.year === yr) || {};
+  const bySrc = {};
+  rows.forEach(r => {
+    (bySrc[r.src] ||= { income: 0, expense: 0, book: 0, cnt: 0, cats: [] });
+    const s = bySrc[r.src];
+    s.cnt += Number(r.cnt);
+    if (r.settle === '内部记账') s.book += Number(r.amount);
+    else if (r.direction === '收入') s.income += Number(r.amount);
+    else s.expense += Number(r.amount);
+    s.cats.push(r);
   });
 
   body.innerHTML = `
     <div class="toolbar">
       <label class="hint" style="margin:0">年度</label>
-      <select id="pf-year" style="width:120px">
-        ${(years.length ? years : [year]).map(y => `<option ${y === year ? 'selected' : ''}>${y}</option>`).join('')}
+      <select id="lg-year" style="width:120px">
+        ${(years || []).map(y => `<option value="${y.year}" ${y.year === yr ? 'selected' : ''}>${y.year}</option>`).join('')}
       </select>
       <div class="spacer"></div>
-      <span class="hint" style="margin:0">${yr.length} 笔</span>
+      <span class="hint" style="margin:0">${cur.cnt || 0} 笔</span>
     </div>
-
-    <div class="pf-entities">
-      ${entityCard(INSTITUTE, '中国电子技术标准化研究院')}
-      ${entityCard(SAIXI, '北京赛西科技产业有限责任公司')}
+    <div class="mini-cards">
+      <div class="mini-card"><div class="mk-k">现金收入</div><div class="mk-v">${wan(cur.income_cash)}<small> 万</small></div></div>
+      <div class="mini-card"><div class="mk-k">现金支出</div><div class="mk-v">${wan(cur.expense_cash)}<small> 万</small></div></div>
+      <div class="mini-card"><div class="mk-k">现金净额</div><div class="mk-v" style="color:${Number(cur.net_cash) < 0 ? 'var(--danger)' : 'inherit'}">${wan(cur.net_cash)}<small> 万</small></div></div>
+      <div class="mini-card"><div class="mk-k">内部计收</div><div class="mk-v">${wan(cur.income_book)}<small> 万</small></div></div>
     </div>
+    <div class="hint">现金口径与内部记账<b>分列统计</b>：内部计收不走真实资金，混入会虚增收入
+      ${Number(cur.income_book) ? `（${yr} 年为 ${wan(cur.income_book)} 万）` : ''}。
+      各来源均从对应业务模块汇总，同一笔只计一次。</div>
 
-    <div class="panel">
-      <div class="panel-h"><h2>资金流向</h2><span class="hint" style="margin:0">${year} 年度</span></div>
-      <div class="panel-b" style="padding:18px 20px">
-        <div class="pf-flow">
-          ${lineStat.map(l => `
-            <div class="pf-flow-row ${l.book ? 'book' : ''}" data-goto="${esc(l.key)}">
-              <span class="pf-ico">${l.icon}</span>
-              <span class="pf-line">${esc(l.short)}
-                ${l.book ? '<span class="tag warn">内部记账</span>' : ''}
-                ${l.pend ? `<span class="tag danger">${l.pend} 笔未结</span>` : ''}
-              </span>
-              <span class="pf-amt">${l.cnt ? wan(l.amt) + ' 万' : '<span class="muted">暂无数据</span>'}</span>
-              <span class="pf-desc muted">${esc(l.desc)}</span>
-            </div>`).join('')}
+    ${Object.entries(bySrc).sort((a, b) => (b[1].income + b[1].expense + b[1].book) - (a[1].income + a[1].expense + a[1].book))
+      .map(([src, s]) => `
+      <div class="panel" style="margin-bottom:14px">
+        <div class="panel-h" style="cursor:pointer" data-toggle="${esc(src)}">
+          <h2 style="font-size:15px">${LEDGER_SRC[src]?.icon || '•'} ${esc(src)}
+            ${s.book ? '<span class="tag warn">内部记账</span>' : ''}</h2>
+          <div style="display:flex;gap:16px;align-items:center;font-size:12.5px">
+            ${s.income ? `<span>收 <b>${wan(s.income)}</b> 万</span>` : ''}
+            ${s.expense ? `<span>支 <b>${wan(s.expense)}</b> 万</span>` : ''}
+            ${s.book ? `<span>计收 <b>${wan(s.book)}</b> 万</span>` : ''}
+            <span class="muted">${s.cnt} 笔</span>
+            <span class="caret" id="caret-${esc(src)}">▸</span>
+          </div>
         </div>
-        <div class="hint" style="margin:16px 0 0">
-          本模块只记<b>对外</b>的真实收付。向院内部门计收的房屋使用费与物业费属分配范畴、
-          内部记账不走资金，已移至「用房分配 · 部门用房」。
-        </div>
-      </div>
-    </div>`;
+        <div class="panel-b" id="body-${esc(src)}" hidden><div style="overflow-x:auto">
+          <table class="sub"><thead><tr>
+            <th>费用类别</th><th>方向</th><th>结算方式</th><th class="num">笔数</th><th class="num">金额</th></tr></thead>
+          <tbody>${s.cats.map(c => `<tr>
+            <td><b>${esc(c.category)}</b></td>
+            <td><span class="tag ${c.direction === '收入' ? 'ok' : ''}">${esc(c.direction)}</span></td>
+            <td>${c.settle === '内部记账' ? '<span class="tag warn">内部记账</span>' : '<span class="muted">实际收付</span>'}</td>
+            <td class="num">${c.cnt}</td><td class="num">${money(c.amount)}</td></tr>`).join('')}</tbody></table>
+        </div></div>
+      </div>`).join('') || '<div class="empty">该年度暂无收支记录</div>'}`;
 
-  body.querySelector('#pf-year').onchange = (e) => {
-    viewPropertyFee._year = parseInt(e.target.value); viewPropertyFee();
-  };
-  body.querySelectorAll('[data-goto]').forEach(r => r.onclick = () => {
-    viewPropertyFee._sub = r.dataset.goto; viewPropertyFee();
+  body.querySelector('#lg-year').onchange = (e) => { viewLedger._year = parseInt(e.target.value); viewLedger(); };
+  body.querySelectorAll('[data-toggle]').forEach(h => h.onclick = () => {
+    const k = h.dataset.toggle;
+    const el2 = body.querySelector(`#body-${CSS.escape(k)}`);
+    el2.hidden = !el2.hidden;
+    body.querySelector(`#caret-${CSS.escape(k)}`).textContent = el2.hidden ? '▸' : '▾';
   });
 }
 
-function renderFeeLine(body, rows, line) {
-  const meta = PF_LINES.find(l => l.key === line);
-  const list = rows.filter(r => r.biz_line === line)
-    .sort((a, b) => (b.year - a.year) || a.id - b.id);
-  const wan = (v) => (v / 10000).toFixed(2);
-  const total = list.reduce((a, r) => a + (r.amount || 0), 0);
-
-  const head = ['年度', '期间', '付款方', '收款方', '费用类型', '房屋/场所', '面积㎡', '金额', '状态', '凭证', ''];
-
-  const row = (r) => `<tr><td>${r.year}</td><td>${esc(r.period || '')}</td><td>${esc(r.payer)}</td>
-       <td>${esc(r.payee)}</td><td>${esc(r.fee_type)}</td><td>${esc(r.site || '')}</td>
-       <td class="num">${r.area ?? ''}</td><td class="num">${money(r.amount)}</td>
-       <td>${stateTag(r.state)}</td><td class="muted">${esc(r.voucher || '')}</td>
-       <td class="actions"><button class="btn link sm" data-e="${r.id}">编辑</button></td></tr>`;
-
+async function renderLedgerDetail(body, yr) {
+  const rows = (await api.get(`/rpc/housing_ledger?p_year=${yr}`)) || [];
+  const sorted = [...rows].sort((a, b) => Number(b.amount) - Number(a.amount));
+  const CAP = 400;
   body.innerHTML = `
-    <div class="hint">${esc(meta.desc)}</div>
-    <div class="panel">
-      <div class="panel-h"><h2>${meta.icon} ${esc(meta.short)}</h2>
-        <span>${list.length} 笔 · 合计 <b>${wan(total)}</b> 万元</span></div>
-      <div class="panel-b"><div style="overflow-x:auto"><table>
-        <thead><tr>${head.map((h, i) => `<th class="${i >= 4 && i <= 7 ? 'num' : ''}">${h}</th>`).join('')}</tr></thead>
-        <tbody>${list.length ? list.map(row).join('')
-          : `<tr><td colspan="${head.length}"><div class="empty">暂无记录，点击右上角"新增收支"录入</div></td></tr>`}</tbody>
-      </table></div></div>
-    </div>`;
-  body.querySelectorAll('[data-e]').forEach(b => b.onclick = () =>
-    openForm('property_fee', rows.find(r => r.id == b.dataset.e)));
+    <div class="toolbar">
+      <input id="lg-q" placeholder="搜索类别/往来单位/场所…" style="width:260px">
+      <span class="hint" style="margin:0" id="lg-cnt"></span><div class="spacer"></div>
+      <span class="hint" style="margin:0">${yr} 年度 · 按金额降序</span>
+    </div>
+    <div class="panel"><div class="panel-b"><div style="overflow-x:auto">
+      <table><thead><tr>
+        <th>来源</th><th>费用类别</th><th>方向</th><th>付款方</th><th>收款方</th>
+        <th>场所</th><th class="num">金额</th><th>结算方式</th><th>状态</th></tr></thead>
+      <tbody id="lg-tb"></tbody></table>
+    </div></div></div>`;
+
+  const draw = (list) => {
+    const shown = list.slice(0, CAP);
+    body.querySelector('#lg-tb').innerHTML = shown.length ? shown.map(r => `<tr>
+      <td><span class="tag">${LEDGER_SRC[r.src]?.icon || ''} ${esc(r.src)}</span></td>
+      <td><b>${esc(r.category)}</b></td>
+      <td><span class="tag ${r.direction === '收入' ? 'ok' : ''}">${esc(r.direction)}</span></td>
+      <td class="muted wrapcol">${esc(r.payer || '')}</td>
+      <td class="muted wrapcol">${esc(r.payee || '')}</td>
+      <td class="muted">${esc(r.site || '')}</td>
+      <td class="num">${money(r.amount)}</td>
+      <td>${r.settle === '内部记账' ? '<span class="tag warn">内部记账</span>' : '实际收付'}</td>
+      <td class="muted">${esc(r.state || '')}</td></tr>`).join('')
+      : '<tr><td colspan="9"><div class="empty">没有匹配的记录</div></td></tr>';
+    body.querySelector('#lg-cnt').textContent =
+      list.length > CAP ? `共 ${list.length} 笔，显示前 ${CAP} 笔` : `共 ${list.length} 笔`;
+  };
+  draw(sorted);
+  body.querySelector('#lg-q').oninput = (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    draw(q ? sorted.filter(r => Object.values(r).some(v => String(v ?? '').toLowerCase().includes(q))) : sorted);
+  };
 }
 
-function stateTag(s) {
-  const done = ['已结清', '已收付', '已分摊'];
-  const mid = ['已开票', '已确认'];
-  const cls = done.includes(s) ? 'ok' : (mid.includes(s) ? 'accent' : 'warn');
-  return `<span class="tag ${cls}">${esc(s || '')}</span>`;
-}
+/* ---------- 对外收付台账（原物业费收支，现为收支层的录入入口） ---------- */
+
 
 /* ---------- 房产明细：房产证 → 幢 两级 ---------- */
+/* 权层：房子是谁的（权证→幢），以及租约如何界定权利边界。
+   租入是"我们取得他人房屋的使用权"，出租是"我们把自有房屋的使用权让渡出去"，
+   两者都是权属关系的一部分，故与权证同层。 */
 async function viewProperty() {
-  setTitle('property', '房产台账');
+  setTitle('property', '房产权属');
+  const sub = viewProperty._sub || 'cert';
+  viewProperty._sub = sub;
+
+  const view = $('#view');
+  const tab = (k, l) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${l}</button>`;
+  view.innerHTML = `
+    <div class="segbar">${tab('cert', '📜 权证与房产')}${tab('lease', '🤝 租约')}</div>
+    <div id="pv-body"><div class="empty">加载中…</div></div>`;
+  view.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => { viewProperty._sub = b.dataset.sub; viewProperty(); });
+
   const actions = $('#topbar-actions'); actions.innerHTML = '';
+  if (sub === 'lease') {
+    const b = el(`<button class="btn primary">${icon('plus')}新增租约</button>`);
+    b.onclick = () => openForm('lease', null);
+    actions.appendChild(b);
+    return renderModuleTable('lease', $('#pv-body'));
+  }
   const addCert = el(`<button class="btn">${icon('plus')}新增房产证</button>`);
   addCert.onclick = () => openForm('property_cert', null);
   const addBld = el(`<button class="btn primary">${icon('plus')}新增幢</button>`);
   addBld.onclick = () => openForm('property', null);
   actions.appendChild(addCert); actions.appendChild(addBld);
 
-  const view = $('#view'); view.innerHTML = '<div class="empty">加载中…</div>';
+  const view2 = $('#pv-body'); view2.innerHTML = '<div class="empty">加载中…</div>';
   const [certs, blds] = await Promise.all([
     api.get('/property_cert'), api.get('/property'),
   ]);
@@ -1032,7 +1073,7 @@ async function viewProperty() {
     .reduce((a, c) => a + (c.building_area || 0), 0);
   const totalActual = (blds || []).reduce((a, b) => a + (b.actual_area || 0), 0);
 
-  view.innerHTML = `
+  view2.innerHTML = `
     <div class="mini-cards">
       <div class="mini-card"><div class="mk-k">权证</div><div class="mk-v">${(certs || []).length}<small> 本</small></div></div>
       <div class="mini-card"><div class="mk-k">幢/楼</div><div class="mk-v">${(blds || []).length}<small> 栋</small></div></div>
@@ -1074,18 +1115,18 @@ async function viewProperty() {
         </div>
       </div>` : ''}`;
 
-  view.querySelectorAll('[data-toggle]').forEach(h => h.onclick = (e) => {
+  view2.querySelectorAll('[data-toggle]').forEach(h => h.onclick = (e) => {
     if (e.target.closest('[data-edit-c]')) return;   // 点"编辑"不触发展开
     const k = h.dataset.toggle;
-    const body = view.querySelector('#body-' + k);
+    const body = view2.querySelector('#body-' + k);
     body.hidden = !body.hidden;
-    view.querySelector('#caret-' + k).textContent = body.hidden ? '▸' : '▾';
+    view2.querySelector('#caret-' + k).textContent = body.hidden ? '▸' : '▾';
   });
-  view.querySelectorAll('[data-edit-c]').forEach(b => b.onclick = (e) => {
+  view2.querySelectorAll('[data-edit-c]').forEach(b => b.onclick = (e) => {
     e.stopPropagation();
     openForm('property_cert', (certs || []).find(c => c.id == b.dataset.editC));
   });
-  view.querySelectorAll('[data-edit-b]').forEach(b => b.onclick = () =>
+  view2.querySelectorAll('[data-edit-b]').forEach(b => b.onclick = () =>
     openForm('property', (blds || []).find(x => x.id == b.dataset.editB)));
 }
 
