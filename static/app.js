@@ -417,7 +417,7 @@ const MODULES = {
     fields: [
       F('biz_line', '业务线', {
         type: 'select', req: 1,
-        options: ['赛西产业向院收取物业费', '院向部机关缴费', '院向外部物业缴费', '院向内部部门收房租'],
+        options: ['赛西产业向院收取物业费', '院向部机关缴费', '院向外部物业缴费'],
       }),
       F('year', '年度', { type: 'number', req: 1, def: new Date().getFullYear() }),
       F('period', '期间（年度/上半年/2025-03 等）'),
@@ -439,6 +439,32 @@ const MODULES = {
       F('notes', '备注', { full: 1 }),
     ],
     attach: 1,
+  },
+  // 部门用房分配。内部计费随分配走——它不是对外收付，而是分配的计价结果。
+  dept_alloc: {
+    title: '部门用房', table: 'dept_alloc', icon: '🏢',
+    hint: '面积按院区分档录入，房屋使用费与物业费按标准自动计算（标准见系统设置）。内部记账，不走真实资金。',
+    columns: [
+      ['year', '年度'], ['dept', '使用部门'], ['area_total', '总面积㎡', 'num'],
+      ['rent_year', '房屋使用费', 'money'], ['pf_year', '物业费', 'money'],
+      ['state', '确认状态', 'status'],
+    ],
+    fields: [
+      F('year', '年度', { type: 'number', req: 1, def: new Date().getFullYear() }),
+      F('dept', '使用部门', { req: 1, full: 1 }),
+      F('area_b1', '院区1号楼面积(㎡)', { type: 'number', def: 0 }),
+      F('area_b23', '院区2、3号楼面积(㎡)', { type: 'number', def: 0 }),
+      F('area_yz', '亦庄院区面积(㎡)', { type: 'number', def: 0 }),
+      F('area_other', '万寿路等其他面积(㎡)', { type: 'number', def: 0 }),
+      F('area_total', '总面积(㎡)', { type: 'number' }),
+      F('rent_year', '房屋使用费(元/年)', { type: 'number' }),
+      F('pf_year', '物业费(元/年)', { type: 'number' }),
+      F('headcount', '在岗人数', { type: 'number' }),
+      F('state', '确认状态', { type: 'select', def: '待确认', options: ['待确认', '已确认', '已分摊'] }),
+      F('confirm_date', '部门确认日', { type: 'date' }),
+      F('alloc_date', '财务分摊日', { type: 'date' }),
+      F('notes', '备注', { full: 1 }),
+    ],
   },
   lease: {
     title: '租赁管理', table: 'lease', icon: '🤝',
@@ -764,9 +790,8 @@ const PF_LINES = [
     desc: '万寿路27号院房屋属部机关产权，我院使用并缴纳物业费、水费、电费。' },
   { key: '院向外部物业缴费', short: '院→外部物业', icon: '🏘️',
     desc: '南湖中园、中雅大厦等院自有产权房屋由外部物业公司管理，院向其缴纳物业费、水电费等。' },
-  { key: '院向内部部门收房租', short: '院→内部部门', icon: '📋', book: 1,
-    desc: '按标准向占用部门计收房租。内部记账、不走真实资金：计收 → 部门确认 → 交院财务处统一分摊成本。' },
 ];
+// 内部房租已迁往「用房分配 · 部门用房」——它本质是分配而非对外收付。
 const INSTITUTE = '中国电子技术标准化研究院';
 const SAIXI = '北京赛西科技产业有限责任公司';
 
@@ -856,8 +881,8 @@ async function viewPropertyFee() {
             </div>`).join('')}
         </div>
         <div class="hint" style="margin:16px 0 0">
-          「内部记账」不走真实资金：按标准计收后需经被征收部门确认，再交院财务处统一分摊成本，
-          故它同时计入院的收入与部门的成本，对院的现金流为零。
+          本模块只记<b>对外</b>的真实收付。向院内部门计收的房屋使用费与物业费属分配范畴、
+          内部记账不走资金，已移至「用房分配 · 部门用房」。
         </div>
       </div>
     </div>`;
@@ -875,22 +900,11 @@ function renderFeeLine(body, rows, line) {
   const list = rows.filter(r => r.biz_line === line)
     .sort((a, b) => (b.year - a.year) || a.id - b.id);
   const wan = (v) => (v / 10000).toFixed(2);
-  const isRent = line === '院向内部部门收房租';
   const total = list.reduce((a, r) => a + (r.amount || 0), 0);
 
-  // 内部房租每个部门有房租与物业费两条，费用类型必须显示，否则两行只有金额不同、无从分辨
-  const head = isRent
-    ? ['年度', '期间', '部门', '费用类型', '面积㎡', '标准', '金额', '状态', '确认日', '分摊日', '']
-    : ['年度', '期间', '付款方', '收款方', '费用类型', '房屋/场所', '面积㎡', '金额', '状态', '凭证', ''];
+  const head = ['年度', '期间', '付款方', '收款方', '费用类型', '房屋/场所', '面积㎡', '金额', '状态', '凭证', ''];
 
-  const row = (r) => isRent
-    ? `<tr><td>${r.year}</td><td>${esc(r.period || '')}</td><td><b>${esc(r.dept || '')}</b></td>
-       <td><span class="tag ${r.fee_type === '房租' ? 'accent' : ''}">${esc(r.fee_type)}</span></td>
-       <td class="num">${r.area ?? ''}</td><td class="num">${r.rate ?? '<span class="muted" title="按院区分档，综合单价见备注">分档</span>'}</td>
-       <td class="num">${money(r.amount)}</td><td>${stateTag(r.state)}</td>
-       <td>${esc(r.confirm_date || '')}</td><td>${esc(r.alloc_date || '')}</td>
-       <td class="actions"><button class="btn link sm" data-e="${r.id}">编辑</button></td></tr>`
-    : `<tr><td>${r.year}</td><td>${esc(r.period || '')}</td><td>${esc(r.payer)}</td>
+  const row = (r) => `<tr><td>${r.year}</td><td>${esc(r.period || '')}</td><td>${esc(r.payer)}</td>
        <td>${esc(r.payee)}</td><td>${esc(r.fee_type)}</td><td>${esc(r.site || '')}</td>
        <td class="num">${r.area ?? ''}</td><td class="num">${money(r.amount)}</td>
        <td>${stateTag(r.state)}</td><td class="muted">${esc(r.voucher || '')}</td>
@@ -1077,11 +1091,13 @@ async function viewProperty() {
 
 async function viewRoomAlloc() {
   setTitle('room', '用房分配');
-  const sub = viewRoomAlloc._sub || 'office';
+  const sub = viewRoomAlloc._sub || 'dept';
   viewRoomAlloc._sub = sub;
 
-  // 三个 sheet 各自对应不同的新增目标
-  const ADD = { office: ['room', '用房'], dorm: ['dorm', '床位'], housing: ['housing', '承租户'] };
+  const ADD = {
+    dept: ['dept_alloc', '部门分配'], office: ['room', '房间'],
+    dorm: ['dorm', '床位'], housing: ['housing', '承租户'],
+  };
   const [addKey, addLabel] = ADD[sub];
   const actions = $('#topbar-actions'); actions.innerHTML = '';
   const addBtn = el(`<button class="btn primary">${icon('plus')}新增${addLabel}</button>`);
@@ -1091,14 +1107,117 @@ async function viewRoomAlloc() {
   const view = $('#view');
   const tab = (k, label) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${label}</button>`;
   view.innerHTML = `
-    <div class="segbar">${tab('office', '🏢 办公用房')}${tab('dorm', '🛏️ 单身宿舍')}${tab('housing', '🏠 公有住房')}</div>
+    <div class="segbar">${tab('dept', '🏢 部门用房')}${tab('office', '🚪 房间明细')}${tab('dorm', '🛏️ 单身宿舍')}${tab('housing', '🏠 公有住房')}</div>
     <div id="ra-body"><div class="empty">加载中…</div></div>`;
   view.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => { viewRoomAlloc._sub = b.dataset.sub; viewRoomAlloc(); });
 
   const body = $('#ra-body');
-  if (sub === 'office') await renderOfficeRooms(body);
+  if (sub === 'dept') await renderDeptAlloc(body);
+  else if (sub === 'office') await renderOfficeRooms(body);
   else if (sub === 'dorm') await renderDormRooms(body);
   else await renderModuleTable('housing', body);
+}
+
+/* 部门用房：按院区分组、点开看该院区下有哪些部门。
+   内部计费原先记在物业费收支里，但它本质是分配（不走真实资金、
+   经部门确认后由院财务处统一分摊成本），故随分配一起放在这里。 */
+const CAMPUS_ORDER = ['院区1号楼', '院区2、3号楼', '亦庄院区', '万寿路等其他'];
+const AREA_KEY = { '院区1号楼': 'area_b1', '院区2、3号楼': 'area_b23', '亦庄院区': 'area_yz', '万寿路等其他': 'area_other' };
+const RATE_KEY = { '院区1号楼': 'rent_rate_b1', '院区2、3号楼': 'rent_rate_b23', '亦庄院区': 'rent_rate_yz', '万寿路等其他': 'rent_rate_other' };
+
+async function renderDeptAlloc(body) {
+  body.innerHTML = '<div class="empty">加载中…</div>';
+  const [rows, cfg] = await Promise.all([api.get('/dept_alloc'), api.get('/settings')]);
+  const list = rows || [];
+  const years = [...new Set(list.map(r => r.year))].sort((a, b) => b - a);
+  const year = renderDeptAlloc._year && years.includes(renderDeptAlloc._year)
+    ? renderDeptAlloc._year : (years[0] || new Date().getFullYear());
+  renderDeptAlloc._year = year;
+  const yr = list.filter(r => r.year === year);
+
+  const rate = (c) => parseFloat(cfg?.[RATE_KEY[c]] ?? 0);
+  const pfRate = parseFloat(cfg?.pf_rate_month ?? 6);
+  const n2 = (v) => Number(v || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+  const wan = (v) => (Number(v || 0) / 10000).toFixed(2);
+
+  const stTag = (s) => `<span class="tag ${s === '已分摊' ? 'ok' : (s === '已确认' ? 'accent' : 'warn')}">${esc(s || '')}</span>`;
+
+  const campusPanel = (c) => {
+    const k = AREA_KEY[c], r = rate(c);
+    const ds = yr.filter(d => (d[k] || 0) > 0).sort((a, b) => b[k] - a[k]);
+    if (!ds.length) return '';
+    const area = ds.reduce((a, d) => a + d[k], 0);
+    const fee = area * r * 365;
+    return `
+      <div class="panel" style="margin-bottom:14px">
+        <div class="panel-h" style="cursor:pointer" data-toggle="${esc(c)}">
+          <h2 style="font-size:15px"><span class="ic">${icon('room')}</span>${esc(c)}
+            <span class="tag">${r} 元/㎡·天</span></h2>
+          <div style="display:flex;gap:16px;align-items:center;font-size:12.5px">
+            <span class="muted">${ds.length} 个部门</span>
+            <span>面积 <b>${n2(area)}</b> ㎡</span>
+            <span>使用费 <b>${wan(fee)}</b> 万</span>
+            <span class="caret" id="caret-${esc(c)}">▸</span>
+          </div>
+        </div>
+        <div class="panel-b" id="body-${esc(c)}" hidden><div style="overflow-x:auto">
+          <table class="sub"><thead><tr>
+            <th>使用部门</th><th class="num">本院区面积㎡</th><th class="num">占该部门</th>
+            <th class="num">本院区使用费</th><th>确认状态</th><th></th></tr></thead>
+          <tbody>
+            ${ds.map(d => `<tr>
+              <td><b>${esc(d.dept)}</b></td>
+              <td class="num">${n2(d[k])}</td>
+              <td class="num muted">${d.area_total ? (d[k] / d.area_total * 100).toFixed(0) + '%' : ''}</td>
+              <td class="num">${money(d[k] * r * 365)}</td>
+              <td>${stTag(d.state)}</td>
+              <td class="actions"><button class="btn link sm" data-d="${d.id}">编辑</button></td></tr>`).join('')}
+            <tr style="background:var(--surface-dim);font-weight:700">
+              <td>小计 ${ds.length} 个部门</td><td class="num">${n2(area)}</td><td></td>
+              <td class="num">${money(fee)}</td><td colspan="2"></td></tr>
+          </tbody></table>
+        </div></div>
+      </div>`;
+  };
+
+  const totArea = yr.reduce((a, d) => a + (d.area_total || 0), 0);
+  const totRent = yr.reduce((a, d) => a + (d.rent_year || 0), 0);
+  const totPf = yr.reduce((a, d) => a + (d.pf_year || 0), 0);
+  const pending = yr.filter(d => d.state === '待确认').length;
+
+  body.innerHTML = `
+    <div class="toolbar">
+      <label class="hint" style="margin:0">年度</label>
+      <select id="da-year" style="width:120px">
+        ${(years.length ? years : [year]).map(y => `<option ${y === year ? 'selected' : ''}>${y}</option>`).join('')}
+      </select>
+      <div class="spacer"></div>
+      <span class="hint" style="margin:0">${yr.length} 个部门${pending ? ` · ${pending} 个待确认` : ''}</span>
+    </div>
+    <div class="mini-cards">
+      <div class="mini-card"><div class="mk-k">分配部门</div><div class="mk-v">${yr.length}<small> 个</small></div></div>
+      <div class="mini-card"><div class="mk-k">分配面积</div><div class="mk-v">${n2(Math.round(totArea))}<small> ㎡</small></div></div>
+      <div class="mini-card"><div class="mk-k">房屋使用费</div><div class="mk-v">${wan(totRent)}<small> 万</small></div></div>
+      <div class="mini-card"><div class="mk-k">物业费</div><div class="mk-v">${wan(totPf)}<small> 万</small></div></div>
+    </div>
+    <div class="hint">点击院区展开该院区下的使用部门。房屋使用费按院区分档计收（元/㎡·天×365），
+      物业费按 ${pfRate} 元/㎡·月×12 全院统一。<b>内部记账、不走真实资金</b>：
+      计收 → 部门确认 → 交院财务处统一分摊成本。标准可在系统设置中调整。</div>
+    ${CAMPUS_ORDER.map(campusPanel).join('') || '<div class="empty">该年度暂无分配记录</div>'}`;
+
+  body.querySelector('#da-year').onchange = (e) => {
+    renderDeptAlloc._year = parseInt(e.target.value); viewRoomAlloc();
+  };
+  body.querySelectorAll('[data-toggle]').forEach(h => h.onclick = () => {
+    const k = h.dataset.toggle;
+    const el2 = body.querySelector(`#body-${CSS.escape(k)}`);
+    el2.hidden = !el2.hidden;
+    body.querySelector(`#caret-${CSS.escape(k)}`).textContent = el2.hidden ? '▸' : '▾';
+  });
+  body.querySelectorAll('[data-d]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    openForm('dept_alloc', list.find(x => x.id == b.dataset.d));
+  });
 }
 
 async function renderOfficeRooms(body) {
