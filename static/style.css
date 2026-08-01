@@ -302,3 +302,8 @@ table.sub tbody tr:hover{background:var(--surface-dim)}
   .pf-flow-row{grid-template-columns:28px 1fr auto}
   .pf-desc{grid-column:1/-1;padding-left:40px}
 }
+
+/* 车务支出：类别占比条 */
+.veh-bar{display:inline-block;width:90px;height:9px;border:2px solid var(--ink);
+  border-radius:999px;background:var(--surface);overflow:hidden;vertical-align:middle}
+.veh-bar i{display:block;height:100%;width:var(--p);background:var(--neon)}

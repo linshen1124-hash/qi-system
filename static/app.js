@@ -474,6 +474,38 @@ const MODULES = {
       F('notes', '备注', { full: 1 }),
     ],
   },
+  vehicle_expense: {
+    title: '车务支出', table: 'vehicle_expense', icon: '⛽',
+    hint: '车辆各项开支。司机补助沿用原有计算口径（行驶补助＋加班补助＋其他），在「司机补助」页维护，不在此重复录入。',
+    columns: [
+      ['year', '年度'], ['period', '期间'], ['category', '费用类别'], ['sub_type', '子类'],
+      ['plate', '车牌'], ['counterparty', '供应商'], ['amount', '金额', 'money'],
+      ['state', '状态', 'status'],
+    ],
+    fields: [
+      F('year', '年度', { type: 'number', req: 1, def: new Date().getFullYear() }),
+      F('period', '期间（年度 / 2026-03 / 上半年）'),
+      F('category', '费用类别', {
+        type: 'select', req: 1,
+        options: ['油费', '充电费', '维修费', '通行费', '保险费', '年检费', '班车租赁费', '其他'],
+      }),
+      F('sub_type', '子类（保险填交强险/商业险；班车填固定或临时租用）', { full: 1 }),
+      F('vehicle_id', '关联车辆', { type: 'ref', ref: 'vehicle', show: 'plate', full: 1 }),
+      F('driver_id', '关联司机', { type: 'ref', ref: 'driver', show: 'name', full: 1 }),
+      F('plate', '车牌（车辆已报废时手填留痕）'),
+      F('counterparty', '供应商/收款方', { full: 1 }),
+      F('qty', '数量', { type: 'number' }),
+      F('unit', '单位（升/度/次）'),
+      F('unit_price', '单价', { type: 'number' }),
+      F('amount', '金额(元)', { type: 'number', req: 1 }),
+      F('occur_date', '发生日期', { type: 'date' }),
+      F('contract_id', '关联合同', { type: 'ref', ref: 'contract', show: 'name', full: 1 }),
+      F('state', '状态', { type: 'select', def: '待付', options: ['待付', '已付', '已结清'] }),
+      F('voucher', '凭证号/发票号', { full: 1 }),
+      F('notes', '备注', { full: 1 }),
+    ],
+    attach: 1,
+  },
   cert_task: {
     title: '权证办理', table: 'cert_task', icon: '📋',
     hint: '权属登记是有周期的事务：申请→受理→测绘→审核→领证，中途可能受阻，需记录受阻原因与最近进展。',
@@ -662,7 +694,8 @@ const NAV = [
     ['repair', '房屋事务', 'Affairs', 'asset'],
     ['property_fee', '房屋收支', 'Ledger', 'fee'],
   ] },
-  { group: '车辆与司机', items: [['trip_record', '行车记录', 'Trip Records', 'trip'], ['subsidy', '司机补助', 'Subsidies', 'subsidy'], ['driver', '司机档案', 'Drivers', 'driver'], ['vehicle', '车辆档案', 'Vehicles', 'vehicle']] },
+  // 司机补助并入车务支出——它是车务开支的一个来源，不该与其他开支分列
+  { group: '车辆与司机', items: [['trip_record', '行车记录', 'Trip Records', 'trip'], ['vehicle_expense', '车务支出', 'Vehicle Costs', 'fee'], ['driver', '司机档案', 'Drivers', 'driver'], ['vehicle', '车辆档案', 'Vehicles', 'vehicle']] },
   // 采购台账 → 合同管理 → 固定资产，按"采购—签约—形成资产"的实际流程排
   { group: '采购与资产', items: [['procurement', '采购台账', 'Procurement', 'cart'], ['contract', '合同管理', 'Contracts', 'contract'], ['asset', '固定资产', 'Assets', 'asset']] },
   { group: '节能管理', items: [['energy_summary', '能耗汇总', 'Energy Summary', 'energy'], ['energy_reading', '能耗台账', 'Energy Ledger', 'energy'], ['energy_activity', '节能宣传', 'Energy Programs', 'megaphone']] },
@@ -720,6 +753,7 @@ function route() {
   if (key === 'property') return viewProperty();
   if (key === 'property_fee') return viewLedger();
   if (key === 'repair') return viewRepair();
+  if (key === 'vehicle_expense') return viewVehicleCost();
   if (key === 'subsidy') return viewSubsidy();
   if (key === 'energy_summary') return viewEnergySummary();
   if (key === 'obligations') return viewObligations();
@@ -813,6 +847,157 @@ td.lbl{width:110px;background:#f5f5f5;text-align:center;white-space:nowrap}
 <div class="sign"><div>部门负责人：___________</div><div>经办人：___________</div></div>
 </div></body></html>`);
   w.document.close();
+}
+
+/* ---------- 车务支出 ---------- */
+const VEH_CAT = {
+  '油费': '⛽', '充电费': '🔌', '维修费': '🔧', '通行费': '🛣️',
+  '保险费': '🛡️', '年检费': '📋', '班车租赁费': '🚌', '司机补助': '👤', '其他': '•',
+};
+
+async function viewVehicleCost() {
+  setTitle('vehicle_expense', '车务支出');
+  const sub = viewVehicleCost._sub || 'overview';
+  viewVehicleCost._sub = sub;
+
+  const actions = $('#topbar-actions'); actions.innerHTML = '';
+  if (sub !== 'subsidy') {
+    const b = el(`<button class="btn primary">${icon('plus')}新增支出</button>`);
+    b.onclick = () => openForm('vehicle_expense', null);
+    actions.appendChild(b);
+  }
+
+  const view = $('#view');
+  const tab = (k, l) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${l}</button>`;
+  view.innerHTML = `
+    <div class="segbar">${tab('overview', '📊 支出总览')}${tab('detail', '📑 支出明细')}${tab('bycar', '🚗 单车成本')}${tab('subsidy', '👤 司机补助')}</div>
+    <div id="vc-body"><div class="empty">加载中…</div></div>`;
+  view.querySelectorAll('[data-sub]').forEach(x => x.onclick = () => { viewVehicleCost._sub = x.dataset.sub; viewVehicleCost(); });
+
+  const body = $('#vc-body');
+  if (sub === 'subsidy') return viewSubsidy(body);
+
+  const years = (await api.get('/rpc/vehicle_ledger_by_year')) || [];
+  const yr = viewVehicleCost._year || years[0]?.year || new Date().getFullYear();
+  viewVehicleCost._year = yr;
+
+  if (sub === 'overview') return renderVehOverview(body, years, yr);
+  if (sub === 'bycar') return renderVehByCar(body, yr);
+  return renderVehDetail(body, yr);
+}
+
+async function renderVehOverview(body, years, yr) {
+  const rows = (await api.get(`/rpc/vehicle_expense_summary?p_year=${yr}`)) || [];
+  const cur = years.find(y => y.year === yr) || {};
+  const byCat = {};
+  rows.forEach(r => {
+    (byCat[r.category] ||= { amount: 0, cnt: 0, unpaid: 0, subs: [] });
+    const c = byCat[r.category];
+    c.amount += Number(r.amount); c.cnt += Number(r.cnt); c.unpaid += Number(r.unpaid);
+    c.subs.push(r);
+  });
+  const total = Object.values(byCat).reduce((a, c) => a + c.amount, 0);
+
+  body.innerHTML = `
+    <div class="toolbar">
+      <label class="hint" style="margin:0">年度</label>
+      <select id="vc-year" style="width:120px">
+        ${years.map(y => `<option value="${y.year}" ${y.year === yr ? 'selected' : ''}>${y.year}</option>`).join('')}
+      </select>
+      <div class="spacer"></div>
+      <span class="hint" style="margin:0">${cur.cnt || 0} 笔${cur.unpaid ? ` · ${cur.unpaid} 笔待付` : ''}</span>
+    </div>
+    <div class="mini-cards">
+      <div class="mini-card"><div class="mk-k">支出合计</div><div class="mk-v">${wan(total)}<small> 万</small></div></div>
+      <div class="mini-card"><div class="mk-k">费用类别</div><div class="mk-v">${Object.keys(byCat).length}<small> 类</small></div></div>
+      <div class="mini-card"><div class="mk-k">待付</div><div class="mk-v" style="color:${cur.unpaid ? 'var(--warn)' : 'inherit'}">${cur.unpaid || 0}<small> 笔</small></div></div>
+    </div>
+    <div class="hint">司机补助沿用原有计算口径（行驶补助＋加班补助＋其他），在「司机补助」页维护后自动计入本总账，不重复录入。</div>
+    ${Object.entries(byCat).sort((a, b) => b[1].amount - a[1].amount).map(([cat, c]) => {
+      const pct = total ? (c.amount / total * 100) : 0;
+      return `
+      <div class="panel" style="margin-bottom:14px">
+        <div class="panel-h" style="cursor:pointer" data-toggle="${esc(cat)}">
+          <h2 style="font-size:15px">${VEH_CAT[cat] || '•'} ${esc(cat)}
+            ${c.unpaid ? `<span class="tag warn">${c.unpaid} 笔待付</span>` : ''}</h2>
+          <div style="display:flex;gap:16px;align-items:center;font-size:12.5px">
+            <span class="veh-bar" style="--p:${pct.toFixed(1)}%"><i></i></span>
+            <span class="muted">${pct.toFixed(1)}%</span>
+            <span>合计 <b>${wan(c.amount)}</b> 万</span>
+            <span class="muted">${c.cnt} 笔</span>
+            <span class="caret" id="caret-${esc(cat)}">▸</span>
+          </div>
+        </div>
+        <div class="panel-b" id="body-${esc(cat)}" hidden><div style="overflow-x:auto">
+          <table class="sub"><thead><tr>
+            <th>子类</th><th class="num">笔数</th><th class="num">金额</th><th class="num">待付</th></tr></thead>
+          <tbody>${c.subs.map(s => `<tr>
+            <td><b>${esc(s.sub_type || '（未分子类）')}</b></td>
+            <td class="num">${s.cnt}</td><td class="num">${money(s.amount)}</td>
+            <td class="num">${s.unpaid || ''}</td></tr>`).join('')}</tbody></table>
+        </div></div>
+      </div>`;
+    }).join('') || '<div class="empty">该年度暂无车务支出</div>'}`;
+
+  body.querySelector('#vc-year').onchange = (e) => { viewVehicleCost._year = parseInt(e.target.value); viewVehicleCost(); };
+  body.querySelectorAll('[data-toggle]').forEach(h => h.onclick = () => {
+    const k = h.dataset.toggle;
+    const el2 = body.querySelector(`#body-${CSS.escape(k)}`);
+    el2.hidden = !el2.hidden;
+    body.querySelector(`#caret-${CSS.escape(k)}`).textContent = el2.hidden ? '▸' : '▾';
+  });
+}
+
+async function renderVehDetail(body, yr) {
+  const rows = (await api.get(`/rpc/vehicle_ledger?p_year=${yr}`)) || [];
+  const sorted = [...rows].sort((a, b) => Number(b.amount) - Number(a.amount));
+  body.innerHTML = `
+    <div class="toolbar">
+      <input id="vc-q" placeholder="搜索类别/车牌/司机/供应商…" style="width:260px">
+      <span class="hint" style="margin:0" id="vc-cnt"></span><div class="spacer"></div>
+      <span class="hint" style="margin:0">${yr} 年度 · 按金额降序</span>
+    </div>
+    <div class="panel"><div class="panel-b"><div style="overflow-x:auto">
+      <table><thead><tr>
+        <th>来源</th><th>期间</th><th>费用类别</th><th>子类</th><th>车辆/司机</th>
+        <th>供应商</th><th class="num">金额</th><th>状态</th></tr></thead>
+      <tbody id="vc-tb"></tbody></table>
+    </div></div></div>`;
+  const draw = (list) => {
+    body.querySelector('#vc-tb').innerHTML = list.length ? list.map(r => `<tr>
+      <td><span class="tag ${r.src === '司机补助' ? 'accent' : ''}">${esc(r.src)}</span></td>
+      <td class="muted">${esc(r.period || '')}</td>
+      <td><b>${VEH_CAT[r.category] || ''} ${esc(r.category)}</b></td>
+      <td class="muted">${esc(r.sub_type || '')}</td>
+      <td>${esc(r.subject || '')}</td>
+      <td class="muted wrapcol">${esc(r.counterparty || '')}</td>
+      <td class="num">${money(r.amount)}</td>
+      <td><span class="tag ${['已付', '已结清'].includes(r.state) ? 'ok' : 'warn'}">${esc(r.state || '')}</span></td></tr>`).join('')
+      : '<tr><td colspan="8"><div class="empty">没有匹配的记录</div></td></tr>';
+    body.querySelector('#vc-cnt').textContent = `共 ${list.length} 笔`;
+  };
+  draw(sorted);
+  body.querySelector('#vc-q').oninput = (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    draw(q ? sorted.filter(r => Object.values(r).some(v => String(v ?? '').toLowerCase().includes(q))) : sorted);
+  };
+}
+
+async function renderVehByCar(body, yr) {
+  const rows = (await api.get(`/rpc/vehicle_cost_by_car?p_year=${yr}`)) || [];
+  const COLS = [['fuel', '油费'], ['charge', '充电费'], ['repair', '维修费'],
+                ['toll', '通行费'], ['insurance', '保险费'], ['inspect', '年检费'], ['other', '其他']];
+  body.innerHTML = `
+    <div class="hint">把开支归到车头上，便于横向比较各车的维持成本。司机补助按人计、不归车，故不在此表。</div>
+    <div class="panel"><div class="panel-b"><div style="overflow-x:auto">
+      <table><thead><tr><th>车牌</th><th>车型</th>
+        ${COLS.map(c => `<th class="num">${c[1]}</th>`).join('')}<th class="num">合计</th></tr></thead>
+      <tbody>${rows.length ? rows.map(r => `<tr>
+        <td><b>${esc(r.plate)}</b></td><td class="muted">${esc(r.model || '')}</td>
+        ${COLS.map(c => `<td class="num">${Number(r[c[0]]) ? money(r[c[0]]) : '<span class="muted">—</span>'}</td>`).join('')}
+        <td class="num"><b>${Number(r.total) ? money(r.total) : '—'}</b></td></tr>`).join('')
+        : '<tr><td colspan="10"><div class="empty">暂无数据</div></td></tr>'}</tbody></table>
+    </div></div></div>`;
 }
 
 /* 权层的租入 / 借用代管两个 sheet：这些房子没有我方权证，
@@ -1804,15 +1989,15 @@ async function renderAttach(box, entity, id) {
 }
 
 /* ---------- 司机补助 ---------- */
-async function viewSubsidy() {
-  setTitle('subsidy', '司机补助结算');
+// 作为「车务支出 · 司机补助」的一页渲染；传入容器即可，不再独占 #view
+async function viewSubsidy(container) {
   const now = new Date();
   let y = viewSubsidy._y || now.getFullYear();
   let mo = viewSubsidy._m || (now.getMonth() + 1);
   viewSubsidy._y = y; viewSubsidy._m = mo;
 
-  $('#topbar-actions').innerHTML = '';
-  const view = $('#view');
+  const view = container || $('#view');
+  if (!container) { setTitle('subsidy', '司机补助结算'); $('#topbar-actions').innerHTML = ''; }
   const render = async () => {
     view.innerHTML = '<div class="empty">加载中…</div>';
     const list = await api.get(`/subsidy?year=${y}&month=${mo}`);
