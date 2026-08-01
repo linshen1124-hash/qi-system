@@ -474,6 +474,29 @@ const MODULES = {
       F('notes', '备注', { full: 1 }),
     ],
   },
+  cert_task: {
+    title: '权证办理', table: 'cert_task', icon: '📋',
+    hint: '权属登记是有周期的事务：申请→受理→测绘→审核→领证，中途可能受阻，需记录受阻原因与最近进展。',
+    columns: [
+      ['name', '事项名称'], ['task_type', '类型'], ['site', '涉及房屋'],
+      ['stage', '进展', 'status'], ['start_date', '启动'], ['last_date', '最近进展'],
+    ],
+    fields: [
+      F('name', '事项名称', { req: 1, full: 1 }),
+      F('task_type', '类型', { type: 'select', options: ['初始登记', '变更登记', '转移登记', '补证', '注销'] }),
+      F('cert_id', '关联权证', { type: 'ref', ref: 'property_cert', show: 'cert_no', full: 1 }),
+      F('property_id', '关联房产', { type: 'ref', ref: 'property', show: 'building', full: 1 }),
+      F('site', '涉及房屋', { full: 1 }),
+      F('stage', '进展', { type: 'select', def: '未启动', options: ['未启动', '申请中', '受理', '测绘', '审核', '已领证', '受阻', '已终止'] }),
+      F('blocked_why', '受阻原因', { full: 1 }),
+      F('start_date', '启动日期', { type: 'date' }),
+      F('last_date', '最近进展日期', { type: 'date' }),
+      F('owner', '经办'),
+      F('source_file', '原件路径', { full: 1 }),
+      F('notes', '备注', { full: 1 }),
+    ],
+    attach: 1,
+  },
   lease: {
     title: '租赁管理', table: 'lease', icon: '🤝',
     hint: '出租与租入合为一表，以「方向」区分——两者字段几乎一致，差别只在院是出租方还是承租方。',
@@ -536,7 +559,7 @@ const MODULES = {
     title: '幢/楼明细', table: 'property', icon: '🏛️',
     hint: '一栋建筑一条。证载面积与实际面积分列：两者在源数据里普遍不符（改扩建、拆除、未测绘），合并会丢掉核对线索。未挂靠任何房产证的即未登记建筑。',
     columns: [
-      ['tenure', '权属'], ['campus', '院区'], ['building', '楼号/名称'], ['usage_type', '用途分类'],
+      ['tenure', '权属'], ['use_status', '使用形态'], ['campus', '院区'], ['building', '楼号/名称'],
       ['cert_building_no', '证载栋号'], ['cert_area', '证载面积㎡', 'num'],
       ['actual_area', '实际面积㎡', 'num'], ['floors', '层数'], ['built_year', '建成年代'],
     ],
@@ -547,6 +570,8 @@ const MODULES = {
       F('building', '楼号及名称（如 1号科研楼 / A座科研楼）', { req: 1 }),
       F('address', '坐落位置', { full: 1 }),
       F('usage_type', '用途分类', { type: 'select', options: ['科研办公用房', '科研实验用房', '业务用房', '服务用房', '设备用房', '附属用房', '住宅', '其他用房'] }),
+      F('use_status', '使用形态', { type: 'select', options: ['内部办公', '职工宿舍', '公有住房', '对外出租', '空置', '混合'] }),
+      F('vacant_area', '空置面积(㎡)', { type: 'number', def: 0 }),
       F('acquire_way', '取得方式', { type: 'select', options: ['自建', '购置', '划拨', '接收', '租入'] }),
       F('acquire_date', '取得日期', { type: 'date' }),
       F('cert_building_no', '证载栋号（如 15、16、17）'),
@@ -790,18 +815,127 @@ td.lbl{width:110px;background:#f5f5f5;text-align:center;white-space:nowrap}
   w.document.close();
 }
 
-/* 事层：对房子做了什么。目前只有修缮工程，留出扩位（巡检、验收等）。 */
+/* 权层的租入 / 借用代管两个 sheet：这些房子没有我方权证，
+   组织方式与自有那套（证→幢）不同，按房产逐条列并挂对应租约。 */
+async function renderTenureSheet(body, tenure) {
+  body.innerHTML = '<div class="empty">加载中…</div>';
+  const [blds, leases] = await Promise.all([api.get('/property'), api.get('/lease')]);
+  const list = (blds || []).filter(b => b.tenure === tenure);
+  const rl = (leases || []).filter(l => l.direction === '租入');
+  const n2 = (v) => v == null ? '' : Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+
+  if (!list.length) {
+    body.innerHTML = `<div class="hint">${tenure === '租入'
+      ? '租入房产：我院向他人承租、取得使用权的房屋。租约见「租约台账」。'
+      : '借用代管：无偿使用或受托代管、既非自有也未签租约的房屋。目前没有此类房产，有了直接在此登记。'}</div>
+      <div class="empty">暂无${esc(tenure)}房产</div>`;
+    return;
+  }
+  const area = list.reduce((a, b) => a + (b.actual_area || 0), 0);
+  const rent = rl.reduce((a, l) => a + (l.total_year || 0), 0);
+
+  body.innerHTML = `
+    <div class="hint">${tenure === '租入'
+      ? '我院向他人承租、取得使用权的房屋。这些房屋没有我方权证，权利边界由租约界定。'
+      : '无偿使用或受托代管的房屋，既非自有也未签租约。'}</div>
+    <div class="mini-cards">
+      <div class="mini-card"><div class="mk-k">${esc(tenure)}房产</div><div class="mk-v">${list.length}<small> 处</small></div></div>
+      <div class="mini-card"><div class="mk-k">实际面积</div><div class="mk-v">${n2(Math.round(area))}<small> ㎡</small></div></div>
+      ${tenure === '租入' ? `<div class="mini-card"><div class="mk-k">年租金支出</div><div class="mk-v">${(rent / 10000).toFixed(2)}<small> 万</small></div></div>` : ''}
+    </div>
+    <div class="panel"><div class="panel-b"><div style="overflow-x:auto">
+      <table><thead><tr>
+        <th>房屋</th><th>院区/地址</th><th>使用形态</th><th class="num">实际面积㎡</th>
+        <th>对应租约</th><th class="num">年租金</th><th></th></tr></thead>
+      <tbody>${list.map(b => {
+        const lz = rl.find(l => l.property_id === b.id
+          || (l.site && b.building && l.site.includes(b.building)));
+        return `<tr>
+          <td><b>${esc(b.building)}</b></td>
+          <td class="muted">${esc(b.campus || '')}</td>
+          <td>${b.use_status ? `<span class="tag">${esc(b.use_status)}</span>` : '<span class="muted">未标注</span>'}</td>
+          <td class="num">${n2(b.actual_area)}</td>
+          <td class="muted wrapcol">${lz ? esc(lz.counterparty) : '<span class="tag warn">未挂租约</span>'}</td>
+          <td class="num">${lz ? money(lz.total_year) : ''}</td>
+          <td class="actions"><button class="btn link sm" data-tb="${b.id}">编辑</button></td></tr>`;
+      }).join('')}</tbody></table>
+    </div></div></div>`;
+  body.querySelectorAll('[data-tb]').forEach(x => x.onclick = () =>
+    openForm('property', list.find(b => b.id == x.dataset.tb)));
+}
+
+/* 事层：对房子做了什么。修缮是工程，登记是有周期的事务（我院安定门证
+   自 2017 年办到 2018 年卡在测绘条件至今），两者都属"事"。 */
 async function viewRepair() {
   setTitle('repair', '房屋事务');
+  const sub = viewRepair._sub || 'repair';
+  viewRepair._sub = sub;
+
   const actions = $('#topbar-actions'); actions.innerHTML = '';
-  const b = el(`<button class="btn primary">${icon('plus')}新增工程</button>`);
-  b.onclick = () => openForm('repair', null);
+  const b = el(`<button class="btn primary">${icon('plus')}新增${sub === 'repair' ? '工程' : '登记事项'}</button>`);
+  b.onclick = () => openForm(sub === 'repair' ? 'repair' : 'cert_task', null);
   actions.appendChild(b);
 
   const view = $('#view');
-  view.innerHTML = `<div class="segbar"><button class="seg-btn active">🔧 修缮工程</button></div>
+  const tab = (k, l) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${l}</button>`;
+  view.innerHTML = `
+    <div class="segbar">${tab('repair', '🔧 修缮工程')}${tab('cert_task', '📋 权证办理')}</div>
     <div id="rp-body"><div class="empty">加载中…</div></div>`;
+  view.querySelectorAll('[data-sub]').forEach(x => x.onclick = () => { viewRepair._sub = x.dataset.sub; viewRepair(); });
+
+  if (sub === 'cert_task') return renderCertTask($('#rp-body'));
   await renderModuleTable('repair', $('#rp-body'));
+}
+
+async function renderCertTask(body) {
+  body.innerHTML = '<div class="empty">加载中…</div>';
+  const rows = (await api.get('/cert_task')) || [];
+  const ORDER = ['受阻', '申请中', '受理', '测绘', '审核', '未启动', '已领证', '已终止'];
+  const list = [...rows].sort((a, b) => ORDER.indexOf(a.stage) - ORDER.indexOf(b.stage));
+  const blocked = list.filter(r => r.stage === '受阻');
+  const open = list.filter(r => !['已领证', '已终止'].includes(r.stage));
+
+  body.innerHTML = `
+    <div class="hint">权属登记不是一次性动作，而是有周期的事务：申请→受理→测绘→审核→领证，中途可能受阻。
+      此前这条线在系统里无处记录，实际却有多年积压。</div>
+    <div class="mini-cards">
+      <div class="mini-card"><div class="mk-k">在办事项</div><div class="mk-v">${open.length}<small> 项</small></div></div>
+      <div class="mini-card"><div class="mk-k">受阻</div><div class="mk-v" style="color:${blocked.length ? 'var(--danger)' : 'inherit'}">${blocked.length}<small> 项</small></div></div>
+    </div>
+    ${list.map(r => `
+      <div class="panel" style="margin-bottom:14px">
+        <div class="panel-h" style="cursor:pointer" data-ct="${r.id}">
+          <h2 style="font-size:15px">${esc(r.name)}
+            <span class="tag ${r.stage === '受阻' ? 'danger' : (r.stage === '已领证' ? 'ok' : (r.stage === '未启动' ? '' : 'accent'))}">${esc(r.stage)}</span>
+            ${r.task_type ? `<span class="tag">${esc(r.task_type)}</span>` : ''}
+          </h2>
+          <div style="display:flex;gap:14px;align-items:center;font-size:12.5px">
+            <span class="muted">${esc(r.site || '')}</span>
+            <button class="btn link sm" data-ce="${r.id}">编辑</button>
+            <span class="caret" id="caret-ct${r.id}">▸</span>
+          </div>
+        </div>
+        <div class="panel-b" id="body-ct${r.id}" hidden>
+          <div class="cert-meta">
+            ${r.start_date ? `<span><b>启动</b> ${esc(r.start_date)}</span>` : ''}
+            ${r.last_date ? `<span><b>最近进展</b> ${esc(r.last_date)}</span>` : ''}
+            ${r.owner ? `<span><b>经办</b> ${esc(r.owner)}</span>` : ''}
+            ${r.blocked_why ? `<span class="full" style="color:var(--danger)"><b>受阻原因</b> ${esc(r.blocked_why)}</span>` : ''}
+            ${r.notes ? `<span class="full muted">${esc(r.notes)}</span>` : ''}
+            ${r.source_file ? `<span class="full muted"><b>原件</b> ${esc(r.source_file)}</span>` : ''}
+          </div>
+        </div>
+      </div>`).join('') || '<div class="empty">暂无登记事项</div>'}`;
+
+  body.querySelectorAll('[data-ct]').forEach(h => h.onclick = (e) => {
+    if (e.target.closest('[data-ce]')) return;
+    const el2 = body.querySelector('#body-ct' + h.dataset.ct);
+    el2.hidden = !el2.hidden;
+    body.querySelector('#caret-ct' + h.dataset.ct).textContent = el2.hidden ? '▸' : '▾';
+  });
+  body.querySelectorAll('[data-ce]').forEach(b2 => b2.onclick = (e) => {
+    e.stopPropagation(); openForm('cert_task', rows.find(r => r.id == b2.dataset.ce));
+  });
 }
 
 /* 收支层：从五个来源汇总的总账。本模块不重复录数——
@@ -966,7 +1100,7 @@ async function viewProperty() {
   const view = $('#view');
   const tab = (k, l) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${l}</button>`;
   view.innerHTML = `
-    <div class="segbar">${tab('cert', '📜 权证与房产')}${tab('lease', '🤝 租约')}</div>
+    <div class="segbar">${tab('cert', '🏛️ 自有产权')}${tab('rent', '🔑 租入')}${tab('borrow', '🤲 借用代管')}${tab('lease', '📜 租约台账')}</div>
     <div id="pv-body"><div class="empty">加载中…</div></div>`;
   view.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => { viewProperty._sub = b.dataset.sub; viewProperty(); });
 
@@ -976,6 +1110,13 @@ async function viewProperty() {
     b.onclick = () => openForm('lease', null);
     actions.appendChild(b);
     return renderModuleTable('lease', $('#pv-body'));
+  }
+  if (sub === 'rent' || sub === 'borrow') {
+    const t = sub === 'rent' ? '租入' : '借用代管';
+    const b = el(`<button class="btn primary">${icon('plus')}新增${t}房产</button>`);
+    b.onclick = () => openForm('property', null);
+    actions.appendChild(b);
+    return renderTenureSheet($('#pv-body'), t);
   }
   const addCert = el(`<button class="btn">${icon('plus')}新增房产证</button>`);
   addCert.onclick = () => openForm('property_cert', null);
@@ -1135,11 +1276,13 @@ async function viewRoomAlloc() {
   const sub = viewRoomAlloc._sub || 'dept';
   viewRoomAlloc._sub = sub;
 
+  // 每个 sheet 的"新增"指向各自的数据表；对外出租新增的是租约，空置只需在台账里改标记
   const ADD = {
-    dept: ['dept_alloc', '部门分配'], office: ['room', '房间'],
-    dorm: ['dorm', '床位'], housing: ['housing', '承租户'],
+    dept: ['dept_alloc', '部门分配'], dorm: ['dorm', '床位'],
+    housing: ['housing', '承租户'], rentout: ['lease', '出租租约'],
+    vacant: ['property', '房产'],
   };
-  const [addKey, addLabel] = ADD[sub];
+  const [addKey, addLabel] = ADD[sub] || ADD.dept;
   const actions = $('#topbar-actions'); actions.innerHTML = '';
   const addBtn = el(`<button class="btn primary">${icon('plus')}新增${addLabel}</button>`);
   addBtn.onclick = () => openForm(addKey, null);
@@ -1147,16 +1290,100 @@ async function viewRoomAlloc() {
 
   const view = $('#view');
   const tab = (k, label) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${label}</button>`;
+  // 按「用」这条轴的五种形态分：内部办公 / 职工宿舍 / 公有住房 / 对外出租 / 空置
   view.innerHTML = `
-    <div class="segbar">${tab('dept', '🏢 部门用房')}${tab('office', '🚪 房间明细')}${tab('dorm', '🛏️ 单身宿舍')}${tab('housing', '🏠 公有住房')}</div>
+    <div class="segbar">${tab('dept', '🏢 内部办公')}${tab('dorm', '🛏️ 职工宿舍')}${tab('housing', '🏠 公有住房')}${tab('rentout', '🤝 对外出租')}${tab('vacant', '⬜ 空置')}</div>
     <div id="ra-body"><div class="empty">加载中…</div></div>`;
   view.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => { viewRoomAlloc._sub = b.dataset.sub; viewRoomAlloc(); });
 
   const body = $('#ra-body');
   if (sub === 'dept') await renderDeptAlloc(body);
-  else if (sub === 'office') await renderOfficeRooms(body);
   else if (sub === 'dorm') await renderDormRooms(body);
-  else await renderModuleTable('housing', body);
+  else if (sub === 'housing') await renderModuleTable('housing', body);
+  else if (sub === 'rentout') await renderRentOut(body);
+  else await renderVacant(body);
+}
+
+/* 用·对外出租：房子在我方名下，但使用权已让渡给外部单位。
+   数据源是租约的出租侧——它既是权利关系，也是一种使用形态。 */
+async function renderRentOut(body) {
+  body.innerHTML = '<div class="empty">加载中…</div>';
+  const rows = ((await api.get('/lease')) || []).filter(l => l.direction === '出租');
+  const live = rows.filter(l => l.state !== '已终止');
+  const overdue = live.filter(l => l.end_date && new Date(l.end_date) < new Date());
+  const total = live.reduce((a, l) => a + (l.total_year || 0), 0);
+  const area = live.reduce((a, l) => a + (l.area || 0), 0);
+
+  body.innerHTML = `
+    <div class="hint">自有房屋让渡使用权给外部单位。这是一种使用形态，同时也是租约关系——
+      条款在「房产权属 · 租约台账」维护，此处按使用视角查看。</div>
+    <div class="mini-cards">
+      <div class="mini-card"><div class="mk-k">出租户数</div><div class="mk-v">${live.length}<small> 户</small></div></div>
+      <div class="mini-card"><div class="mk-k">出租面积</div><div class="mk-v">${area.toLocaleString('zh-CN')}<small> ㎡</small></div></div>
+      <div class="mini-card"><div class="mk-k">年租金收入</div><div class="mk-v">${(total / 10000).toFixed(2)}<small> 万</small></div></div>
+      <div class="mini-card"><div class="mk-k">已过期</div><div class="mk-v" style="color:${overdue.length ? 'var(--danger)' : 'inherit'}">${overdue.length}<small> 户</small></div></div>
+    </div>
+    <div class="panel"><div class="panel-b"><div style="overflow-x:auto">
+      <table><thead><tr>
+        <th>承租单位</th><th>关系</th><th>房屋</th><th class="num">面积㎡</th>
+        <th class="num">年租金</th><th class="num">年物业费</th><th>租期止</th><th>状态</th><th></th></tr></thead>
+      <tbody>${live.length ? live.map(l => {
+        const od = l.end_date && new Date(l.end_date) < new Date();
+        const days = l.end_date ? Math.round((new Date(l.end_date) - new Date()) / 864e5) : null;
+        return `<tr${od ? ' style="background:rgba(229,72,77,.07)"' : ''}>
+          <td><b>${esc(l.counterparty)}</b></td>
+          <td>${l.cp_relation ? `<span class="tag ${l.cp_relation === '院属公司' ? 'accent' : ''}">${esc(l.cp_relation)}</span>` : ''}</td>
+          <td class="muted wrapcol">${esc(l.site || '')}</td>
+          <td class="num">${l.area ?? ''}</td>
+          <td class="num">${money(l.rent_year)}</td>
+          <td class="num">${money(l.fee_year)}</td>
+          <td>${esc(l.end_date || '—')}</td>
+          <td>${od ? `<span class="tag danger">已过期 ${-days} 天</span>` : `<span class="tag ok">${esc(l.state)}</span>`}</td>
+          <td class="actions"><button class="btn link sm" data-lo="${l.id}">编辑</button></td></tr>`;
+      }).join('') : '<tr><td colspan="9"><div class="empty">暂无对外出租</div></td></tr>'}</tbody></table>
+    </div></div></div>`;
+  body.querySelectorAll('[data-lo]').forEach(b2 => b2.onclick = () =>
+    openForm('lease', rows.find(l => l.id == b2.dataset.lo)));
+}
+
+/* 用·空置：闲置房产是管理重点——占着面积、摊着物业费和水电，却不产生使用价值。
+   此前系统里完全没有位置，无从发现。 */
+async function renderVacant(body) {
+  body.innerHTML = '<div class="empty">加载中…</div>';
+  const blds = (await api.get('/property')) || [];
+  const vacant = blds.filter(b => b.use_status === '空置' || (b.vacant_area || 0) > 0);
+  const untagged = blds.filter(b => !b.use_status);
+  const n2 = (v) => v == null ? '' : Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+  const vArea = vacant.reduce((a, b) => a + (b.use_status === '空置' ? (b.actual_area || 0) : (b.vacant_area || 0)), 0);
+  const allArea = blds.reduce((a, b) => a + (b.actual_area || 0), 0);
+
+  body.innerHTML = `
+    <div class="hint">空置房产占着面积、摊着物业费与水电，却不产生使用价值，是压降成本的首要抓手。
+      整栋空置的按实际面积计，部分空置的按「空置面积」字段计——后者需在房产台账中填写。</div>
+    <div class="mini-cards">
+      <div class="mini-card"><div class="mk-k">空置房产</div><div class="mk-v">${vacant.length}<small> 处</small></div></div>
+      <div class="mini-card"><div class="mk-k">空置面积</div><div class="mk-v">${n2(Math.round(vArea))}<small> ㎡</small></div></div>
+      <div class="mini-card"><div class="mk-k">占总面积</div><div class="mk-v">${allArea ? (vArea / allArea * 100).toFixed(1) : '0.0'}<small> %</small></div></div>
+      <div class="mini-card"><div class="mk-k">未标注用途</div><div class="mk-v" style="color:${untagged.length ? 'var(--warn)' : 'inherit'}">${untagged.length}<small> 处</small></div></div>
+    </div>
+    <div class="panel"><div class="panel-b"><div style="overflow-x:auto">
+      <table><thead><tr>
+        <th>房屋</th><th>院区</th><th>权属</th><th>使用形态</th>
+        <th class="num">实际面积㎡</th><th class="num">空置面积㎡</th><th>备注</th><th></th></tr></thead>
+      <tbody>${vacant.length ? vacant.map(b => `<tr>
+        <td><b>${esc(b.building)}</b></td><td class="muted">${esc(b.campus || '')}</td>
+        <td><span class="tag ${b.tenure === '自有' ? '' : 'ct-land'}">${esc(b.tenure || '')}</span></td>
+        <td><span class="tag warn">${esc(b.use_status || '')}</span></td>
+        <td class="num">${n2(b.actual_area)}</td>
+        <td class="num">${b.use_status === '空置' ? n2(b.actual_area) : n2(b.vacant_area)}</td>
+        <td class="muted wrapcol">${esc(b.notes || '')}</td>
+        <td class="actions"><button class="btn link sm" data-vb="${b.id}">编辑</button></td></tr>`).join('')
+        : '<tr><td colspan="8"><div class="empty">当前没有标注为空置的房产</div></td></tr>'}</tbody></table>
+    </div></div></div>
+    ${untagged.length ? `<div class="hint">还有 ${untagged.length} 处房产未标注使用形态，无法判断是否空置：
+      ${untagged.map(b => esc(b.building)).join('、')}</div>` : ''}`;
+  body.querySelectorAll('[data-vb]').forEach(b2 => b2.onclick = () =>
+    openForm('property', blds.find(b => b.id == b2.dataset.vb)));
 }
 
 /* 部门用房：按院区分组、点开看该院区下有哪些部门。
@@ -1244,11 +1471,26 @@ async function renderDeptAlloc(body) {
     <div class="hint">点击院区展开该院区下的使用部门。房屋使用费按院区分档计收（元/㎡·天×365），
       物业费按 ${pfRate} 元/㎡·月×12 全院统一。<b>内部记账、不走真实资金</b>：
       计收 → 部门确认 → 交院财务处统一分摊成本。标准可在系统设置中调整。</div>
-    ${CAMPUS_ORDER.map(campusPanel).join('') || '<div class="empty">该年度暂无分配记录</div>'}`;
+    ${CAMPUS_ORDER.map(campusPanel).join('') || '<div class="empty">该年度暂无分配记录</div>'}
+    <div class="panel" style="margin-bottom:14px">
+      <div class="panel-h" style="cursor:pointer" data-toggle="__rooms">
+        <h2 style="font-size:15px"><span class="ic">${icon('room')}</span>房间明细</h2>
+        <div style="display:flex;gap:14px;align-items:center;font-size:12.5px">
+          <span class="muted">具体到房号的分配记录</span>
+          <span class="caret" id="caret-__rooms">▸</span>
+        </div>
+      </div>
+      <div class="panel-b" id="body-__rooms" hidden><div id="room-detail"><div class="empty">展开加载…</div></div></div>
+    </div>`;
 
   body.querySelector('#da-year').onchange = (e) => {
     renderDeptAlloc._year = parseInt(e.target.value); viewRoomAlloc();
   };
+  // 房间明细按需加载，避免每次进页面都多拉一次
+  body.querySelector('[data-toggle="__rooms"]').addEventListener('click', async () => {
+    const box = body.querySelector('#room-detail');
+    if (!box.dataset.loaded) { box.dataset.loaded = '1'; await renderOfficeRooms(box); }
+  }, { once: false });
   body.querySelectorAll('[data-toggle]').forEach(h => h.onclick = () => {
     const k = h.dataset.toggle;
     const el2 = body.querySelector(`#body-${CSS.escape(k)}`);
