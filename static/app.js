@@ -505,8 +505,49 @@ const MODULES = {
       F('notes', '备注', { full: 1 }),
     ],
   },
+  // 事层：六类事项共用一表，以 task_type 判别。拆六张表会造成大量重复结构。
+  vehicle_task: {
+    title: '车务事项', table: 'vehicle_task', icon: '🔧',
+    hint: '事记过程、收支记钱。事项上填了金额的，不要在「车务收支」里重复录同一笔——总账会自动汇总。',
+    columns: [
+      ['task_type', '事项类型'], ['title', '事项'], ['plate', '车牌'],
+      ['counterparty', '对方单位'], ['state', '状态', 'status'],
+      ['amount', '支出', 'money'], ['income', '收入', 'money'],
+    ],
+    fields: [
+      F('task_type', '事项类型', {
+        type: 'select', req: 1,
+        options: ['维修保养', '保险', '年检', '报废处置', '事故', '卡务'],
+      }),
+      F('title', '事项名称', { req: 1, full: 1 }),
+      F('vehicle_id', '关联车辆', { type: 'ref', ref: 'vehicle', show: 'plate', full: 1 }),
+      F('plate', '车牌（车辆已注销时手填留痕）'),
+      F('driver_id', '关联司机（事故/维修申请）', { type: 'ref', ref: 'driver', show: 'name', full: 1 }),
+      F('counterparty', '对方单位（维修厂家/保险公司/检验机构/回收单位）', { full: 1 }),
+      F('content', '内容（维修项目 / 报废原因 / 事故经过）', { full: 1 }),
+      F('doc_no', '单据号（保单号/理赔号/卡号）'),
+      F('method', '方式（险种 / 处置方式 / 卡务动作）'),
+      F('apply_date', '申请日期', { type: 'date' }),
+      F('occur_date', '发生日期（事故）', { type: 'date' }),
+      F('start_date', '起始日（保单起保）', { type: 'date' }),
+      F('end_date', '截止日（保单到期）', { type: 'date' }),
+      F('done_date', '完成/办结日期', { type: 'date' }),
+      F('next_date', '下次到期（年检）', { type: 'date' }),
+      F('est_amount', '预估金额(元)', { type: 'number' }),
+      F('amount', '实际支出(元)', { type: 'number' }),
+      F('income', '收入(元，报废处置残值/拍卖款)', { type: 'number' }),
+      F('applicant', '申请人'), F('approver', '审批人'),
+      F('approve_date', '审批日期', { type: 'date' }),
+      F('result', '结果（年检结论 / 事故责任认定）', { full: 1 }),
+      F('state', '状态', { type: 'select', def: '待办', options: ['待办', '待审批', '已审批', '进行中', '已完成', '已取消'] }),
+      F('contract_id', '关联合同', { type: 'ref', ref: 'contract', show: 'name', full: 1 }),
+      F('source_file', '原件路径', { full: 1 }),
+      F('notes', '备注', { full: 1 }),
+    ],
+    attach: 1,
+  },
   vehicle_expense: {
-    title: '车务支出', table: 'vehicle_expense', icon: '⛽',
+    title: '车务收支', table: 'vehicle_expense', icon: '⛽',
     hint: '车辆各项开支。司机补助沿用原有计算口径（行驶补助＋加班补助＋其他），在「司机补助」页维护，不在此重复录入。',
     columns: [
       ['year', '年度'], ['period', '期间'], ['category', '费用类别'], ['sub_type', '子类'],
@@ -514,6 +555,7 @@ const MODULES = {
       ['state', '状态', 'status'],
     ],
     fields: [
+      F('direction', '方向', { type: 'select', def: '支出', options: ['支出', '收入'] }),
       F('year', '年度', { type: 'number', req: 1, def: new Date().getFullYear() }),
       F('period', '期间（年度 / 2026-03 / 上半年）'),
       F('category', '费用类别', {
@@ -733,8 +775,9 @@ const NAV = [
   { group: '车辆与司机', items: [
     ['vehicle', '车辆档案', 'Vehicles', 'vehicle'],
     ['trip_record', '用车管理', 'Trips', 'trip'],
+    ['vehicle_task', '车务事项', 'Affairs', 'asset'],
     ['driver', '司机管理', 'Drivers', 'driver'],
-    ['vehicle_expense', '车务支出', 'Vehicle Costs', 'fee'],
+    ['vehicle_expense', '车务收支', 'Ledger', 'fee'],
   ] },
   // 采购台账 → 合同管理 → 固定资产，按"采购—签约—形成资产"的实际流程排
   { group: '采购与资产', items: [['procurement', '采购台账', 'Procurement', 'cart'], ['contract', '合同管理', 'Contracts', 'contract'], ['asset', '固定资产', 'Assets', 'asset']] },
@@ -794,6 +837,7 @@ function route() {
   if (key === 'property_fee') return viewLedger();
   if (key === 'repair') return viewRepair();
   if (key === 'vehicle_expense') return viewVehicleCost();
+  if (key === 'vehicle_task') return viewVehicleTask();
   if (key === 'trip_record') return viewTripMgmt();
   if (key === 'driver') return viewDriverMgmt();
   if (key === 'subsidy') return viewSubsidy();
@@ -983,14 +1027,130 @@ async function viewDriverMgmt() {
   await renderModuleTable('driver', body);
 }
 
-/* ---------- 车务支出 ---------- */
+/* 事层：对车做了什么。六类事项各有制度依据（车辆管理办法 电标物〔2017〕386号）：
+   维修保养第七条(二) / 保险第七条(一) / 年检第十条 / 报废走固定资产报废流程 /
+   事故第十条须报物业管理中心 / 卡务第八条一车一卡。 */
+const VTASK = [
+  { key: '维修保养', icon: '🔧', desc: '驾驶员填《车辆维修(保养)申请单》，按院资金审批权限审批后送修（办法第七条二）。' },
+  { key: '保险', icon: '🛡️', desc: '交强险与商业险分列，保险公司由条件保障部商物业管理中心按集中采购规定选择（第七条一）。' },
+  { key: '年检', icon: '📋', desc: '记录检验机构、结论与下次到期日；到期提醒由规则引擎自动生成（第十条：证照齐全有效）。' },
+  { key: '报废处置', icon: '🚫', desc: '走固定资产报废流程：申请→鉴定→审批→处置→注销。处置残值与拍卖款计入收入。' },
+  { key: '事故', icon: '⚠️', desc: '出现事故应急处理并向物业管理中心报告（第十条）。公车均投高额商业险，赔付不构成院方支出。' },
+  { key: '卡务', icon: '💳', desc: '油卡一车一卡、由物业管理中心统一管理；现金加油须分管院领导批准报销（第八条）。' },
+];
+
+async function viewVehicleTask() {
+  setTitle('vehicle_task', '车务事项');
+  const sub = viewVehicleTask._sub || 'all';
+  viewVehicleTask._sub = sub;
+
+  const actions = $('#topbar-actions'); actions.innerHTML = '';
+  const b = el(`<button class="btn primary">${icon('plus')}新增事项</button>`);
+  b.onclick = () => openForm('vehicle_task', null);
+  actions.appendChild(b);
+
+  const view = $('#view');
+  const tab = (k, l) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${l}</button>`;
+  view.innerHTML = `
+    <div class="segbar">${tab('all', '📊 事项总览')}${VTASK.map(t => tab(t.key, t.icon + ' ' + t.key)).join('')}</div>
+    <div id="vt-body"><div class="empty">加载中…</div></div>`;
+  view.querySelectorAll('[data-sub]').forEach(x => x.onclick = () => { viewVehicleTask._sub = x.dataset.sub; viewVehicleTask(); });
+
+  const rows = (await api.get('/vehicle_task')) || [];
+  const body = $('#vt-body');
+  if (sub !== 'all') return renderVTaskType(body, rows, sub);
+
+  const open = rows.filter(r => !['已完成', '已取消'].includes(r.state));
+  const exp = rows.reduce((a, r) => a + (r.amount || 0), 0);
+  const inc = rows.reduce((a, r) => a + (r.income || 0), 0);
+
+  body.innerHTML = `
+    <div class="hint"><b>事记过程，收支记钱。</b>一件事产生一笔或多笔款项——事项上填了金额的，
+      不要在「车务收支」里重复录同一笔，总账会自动汇总两边。</div>
+    <div class="mini-cards">
+      <div class="mini-card"><div class="mk-k">事项总数</div><div class="mk-v">${rows.length}<small> 项</small></div></div>
+      <div class="mini-card"><div class="mk-k">在办</div><div class="mk-v" style="color:${open.length ? 'var(--warn)' : 'inherit'}">${open.length}<small> 项</small></div></div>
+      <div class="mini-card"><div class="mk-k">支出</div><div class="mk-v">${wan(exp)}<small> 万</small></div></div>
+      <div class="mini-card"><div class="mk-k">收入</div><div class="mk-v">${wan(inc)}<small> 万</small></div></div>
+    </div>
+    ${VTASK.map(t => {
+      const list = rows.filter(r => r.task_type === t.key);
+      const o = list.filter(r => !['已完成', '已取消'].includes(r.state)).length;
+      const a = list.reduce((x, r) => x + (r.amount || 0), 0);
+      return `
+      <div class="panel" style="margin-bottom:14px">
+        <div class="panel-h" style="cursor:pointer" data-goto="${esc(t.key)}">
+          <h2 style="font-size:15px">${t.icon} ${esc(t.key)}
+            ${o ? `<span class="tag warn">${o} 项在办</span>` : ''}
+            ${!list.length ? '<span class="tag">暂无记录</span>' : ''}</h2>
+          <div style="display:flex;gap:16px;align-items:center;font-size:12.5px">
+            ${a ? `<span>支出 <b>${wan(a)}</b> 万</span>` : ''}
+            <span class="muted">${list.length} 项</span>
+          </div>
+        </div>
+        <div class="panel-b" style="padding:12px 20px"><span class="pf-desc muted">${esc(t.desc)}</span></div>
+      </div>`;
+    }).join('')}`;
+
+  body.querySelectorAll('[data-goto]').forEach(h => h.onclick = () => {
+    viewVehicleTask._sub = h.dataset.goto; viewVehicleTask();
+  });
+}
+
+function renderVTaskType(body, rows, type) {
+  const meta = VTASK.find(t => t.key === type);
+  const list = rows.filter(r => r.task_type === type)
+    .sort((a, b) => String(b.apply_date || b.occur_date || '').localeCompare(String(a.apply_date || a.occur_date || '')));
+
+  // 各类事项关注的字段不同，表头按类型切换
+  const HEAD = {
+    '维修保养': ['事项', '车牌', '维修厂家', '维修内容', '申请人', '审批人', '预估', '实际支出', '状态'],
+    '保险': ['事项', '车牌', '保险公司', '险种', '保单号', '起保', '到期', '保费', '状态'],
+    '年检': ['事项', '车牌', '检验机构', '检验日期', '结论', '下次到期', '费用', '状态'],
+    '报废处置': ['事项', '车牌', '处置方式', '报废原因', '回收单位', '办结日', '处置收入', '状态'],
+    '事故': ['事项', '车牌', '司机', '发生日期', '事故经过', '责任认定', '理赔号', '状态'],
+    '卡务': ['事项', '车牌', '卡号', '动作', '对方单位', '日期', '金额', '状态'],
+  }[type];
+
+  const st = (s) => `<span class="tag ${['已完成'].includes(s) ? 'ok' : (s === '已取消' ? '' : 'warn')}">${esc(s || '')}</span>`;
+  const cell = (r) => {
+    const t = (v) => `<td class="muted">${esc(v || '')}</td>`;
+    const n = (v) => `<td class="num">${v ? money(v) : ''}</td>`;
+    switch (type) {
+      case '维修保养': return `${t(r.plate)}${t(r.counterparty)}<td class="wrapcol">${esc(r.content || '')}</td>${t(r.applicant)}${t(r.approver)}${n(r.est_amount)}${n(r.amount)}`;
+      case '保险': return `${t(r.plate)}${t(r.counterparty)}${t(r.method)}${t(r.doc_no)}${t(r.start_date)}${t(r.end_date)}${n(r.amount)}`;
+      case '年检': return `${t(r.plate)}${t(r.counterparty)}${t(r.done_date)}${t(r.result)}${t(r.next_date)}${n(r.amount)}`;
+      case '报废处置': return `${t(r.plate)}${t(r.method)}<td class="wrapcol">${esc(r.content || '')}</td>${t(r.counterparty)}${t(r.done_date)}${n(r.income)}`;
+      case '事故': return `${t(r.plate)}${t(r.applicant)}${t(r.occur_date)}<td class="wrapcol">${esc(r.content || '')}</td>${t(r.result)}${t(r.doc_no)}`;
+      default: return `${t(r.plate)}${t(r.doc_no)}${t(r.method)}${t(r.counterparty)}${t(r.occur_date || r.done_date)}${n(r.amount)}`;
+    }
+  };
+
+  body.innerHTML = `
+    <div class="hint">${esc(meta.desc)}</div>
+    <div class="panel">
+      <div class="panel-h"><h2>${meta.icon} ${esc(type)}</h2>
+        <span class="hint" style="margin:0">${list.length} 项</span></div>
+      <div class="panel-b"><div style="overflow-x:auto">
+        <table><thead><tr>${HEAD.map((h, i) => `<th class="${i >= HEAD.length - 3 && /支出|收入|费用|保费|预估/.test(h) ? 'num' : ''}">${h}</th>`).join('')}<th></th></tr></thead>
+        <tbody>${list.length ? list.map(r => `<tr>
+          <td><b>${esc(r.title)}</b></td>${cell(r)}<td>${st(r.state)}</td>
+          <td class="actions"><button class="btn link sm" data-vt="${r.id}">编辑</button></td></tr>`).join('')
+          : `<tr><td colspan="${HEAD.length + 1}"><div class="empty">暂无${esc(type)}记录，点击右上角"新增事项"录入</div></td></tr>`}</tbody></table>
+      </div></div>
+    </div>`;
+  body.querySelectorAll('[data-vt]').forEach(b2 => b2.onclick = () =>
+    openForm('vehicle_task', rows.find(r => r.id == b2.dataset.vt)));
+}
+
+/* ---------- 车务收支 ---------- */
 const VEH_CAT = {
   '油费': '⛽', '充电费': '🔌', '维修费': '🔧', '通行费': '🛣️',
   '保险费': '🛡️', '年检费': '📋', '班车租赁费': '🚌', '司机补助': '👤', '其他': '•',
 };
 
 async function viewVehicleCost() {
-  setTitle('vehicle_expense', '车务支出');
+  setTitle('vehicle_expense', '车务收支');
   const sub = viewVehicleCost._sub || 'overview';
   viewVehicleCost._sub = sub;
 
@@ -1024,14 +1184,17 @@ async function viewVehicleCost() {
 async function renderVehOverview(body, years, yr) {
   const rows = (await api.get(`/rpc/vehicle_expense_summary?p_year=${yr}`)) || [];
   const cur = years.find(y => y.year === yr) || {};
+  // summary 现在带 direction，收入与支出分开统计，否则报废收入会被当成支出算进占比
   const byCat = {};
   rows.forEach(r => {
-    (byCat[r.category] ||= { amount: 0, cnt: 0, unpaid: 0, subs: [] });
-    const c = byCat[r.category];
+    const k = `${r.direction}·${r.category}`;
+    (byCat[k] ||= { direction: r.direction, category: r.category, amount: 0, cnt: 0, unpaid: 0, subs: [] });
+    const c = byCat[k];
     c.amount += Number(r.amount); c.cnt += Number(r.cnt); c.unpaid += Number(r.unpaid);
     c.subs.push(r);
   });
-  const total = Object.values(byCat).reduce((a, c) => a + c.amount, 0);
+  const expTotal = Object.values(byCat).filter(c => c.direction === '支出').reduce((a, c) => a + c.amount, 0);
+  const total = expTotal;
 
   body.innerHTML = `
     <div class="toolbar">
@@ -1043,21 +1206,23 @@ async function renderVehOverview(body, years, yr) {
       <span class="hint" style="margin:0">${cur.cnt || 0} 笔${cur.unpaid ? ` · ${cur.unpaid} 笔待付` : ''}</span>
     </div>
     <div class="mini-cards">
-      <div class="mini-card"><div class="mk-k">支出合计</div><div class="mk-v">${wan(total)}<small> 万</small></div></div>
+      <div class="mini-card"><div class="mk-k">支出合计</div><div class="mk-v">${wan(cur.expense)}<small> 万</small></div></div>
+      <div class="mini-card"><div class="mk-k">收入合计</div><div class="mk-v">${wan(cur.income)}<small> 万</small></div></div>
       <div class="mini-card"><div class="mk-k">费用类别</div><div class="mk-v">${Object.keys(byCat).length}<small> 类</small></div></div>
       <div class="mini-card"><div class="mk-k">待付</div><div class="mk-v" style="color:${cur.unpaid ? 'var(--warn)' : 'inherit'}">${cur.unpaid || 0}<small> 笔</small></div></div>
     </div>
     <div class="hint">司机补助沿用原有计算口径（行驶补助＋加班补助＋其他），在「司机补助」页维护后自动计入本总账，不重复录入。</div>
     ${Object.entries(byCat).sort((a, b) => b[1].amount - a[1].amount).map(([cat, c]) => {
-      const pct = total ? (c.amount / total * 100) : 0;
+      const pct = c.direction === '支出' && total ? (c.amount / total * 100) : 0;
       return `
       <div class="panel" style="margin-bottom:14px">
         <div class="panel-h" style="cursor:pointer" data-toggle="${esc(cat)}">
-          <h2 style="font-size:15px">${VEH_CAT[cat] || '•'} ${esc(cat)}
+          <h2 style="font-size:15px">${VEH_CAT[c.category] || '•'} ${esc(c.category)}
+            <span class="tag ${c.direction === '收入' ? 'ok' : ''}">${esc(c.direction)}</span>
             ${c.unpaid ? `<span class="tag warn">${c.unpaid} 笔待付</span>` : ''}</h2>
           <div style="display:flex;gap:16px;align-items:center;font-size:12.5px">
-            <span class="veh-bar" style="--p:${pct.toFixed(1)}%"><i></i></span>
-            <span class="muted">${pct.toFixed(1)}%</span>
+            ${c.direction === '支出' ? `<span class="veh-bar" style="--p:${pct.toFixed(1)}%"><i></i></span>
+            <span class="muted">${pct.toFixed(1)}%</span>` : ''}
             <span>合计 <b>${wan(c.amount)}</b> 万</span>
             <span class="muted">${c.cnt} 笔</span>
             <span class="caret" id="caret-${esc(cat)}">▸</span>
@@ -1094,21 +1259,22 @@ async function renderVehDetail(body, yr) {
     </div>
     <div class="panel"><div class="panel-b"><div style="overflow-x:auto">
       <table><thead><tr>
-        <th>来源</th><th>期间</th><th>费用类别</th><th>子类</th><th>车辆/司机</th>
-        <th>供应商</th><th class="num">金额</th><th>状态</th></tr></thead>
+        <th>来源</th><th>期间</th><th>方向</th><th>费用类别</th><th>子类</th><th>车辆/司机</th>
+        <th>对方单位</th><th class="num">金额</th><th>状态</th></tr></thead>
       <tbody id="vc-tb"></tbody></table>
     </div></div></div>`;
   const draw = (list) => {
     body.querySelector('#vc-tb').innerHTML = list.length ? list.map(r => `<tr>
       <td><span class="tag ${r.src === '司机补助' ? 'accent' : ''}">${esc(r.src)}</span></td>
       <td class="muted">${esc(r.period || '')}</td>
+      <td><span class="tag ${r.direction === '收入' ? 'ok' : ''}">${esc(r.direction)}</span></td>
       <td><b>${VEH_CAT[r.category] || ''} ${esc(r.category)}</b></td>
       <td class="muted">${esc(r.sub_type || '')}</td>
       <td>${esc(r.subject || '')}</td>
       <td class="muted wrapcol">${esc(r.counterparty || '')}</td>
       <td class="num">${money(r.amount)}</td>
       <td><span class="tag ${['已付', '已结清'].includes(r.state) ? 'ok' : 'warn'}">${esc(r.state || '')}</span></td></tr>`).join('')
-      : '<tr><td colspan="8"><div class="empty">没有匹配的记录</div></td></tr>';
+      : '<tr><td colspan="9"><div class="empty">没有匹配的记录</div></td></tr>';
     body.querySelector('#vc-cnt').textContent = `共 ${list.length} 笔`;
   };
   draw(sorted);
