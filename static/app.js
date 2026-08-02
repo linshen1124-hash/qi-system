@@ -170,8 +170,39 @@ const F = (key, label, opt = {}) => ({ key, label, ...opt });
 const MODULES = {
   driver: {
     title: '司机档案', table: 'driver', icon: '🧑‍✈️',
-    columns: [['name', '姓名'], ['phone', '联系电话'], ['active', '在岗', 'bool'], ['notes', '备注']],
-    fields: [F('name', '姓名', { req: 1 }), F('phone', '联系电话'), F('active', '在岗', { type: 'bool', def: 1 }), F('notes', '备注', { full: 1 })],
+    hint: '车辆管理办法第十条要求驾驶员保证证照齐全有效。驾驶证过期继续驾驶即无证驾驶，故有效期为必填项。',
+    columns: [
+      ['name', '姓名'], ['is_fulltime', '专职', 'bool'], ['license_class', '准驾车型'],
+      ['license_expire', '驾驶证到期', 'expire'], ['phone', '联系电话'], ['active', '在岗', 'bool'],
+    ],
+    fields: [
+      F('name', '姓名', { req: 1 }), F('phone', '联系电话'),
+      F('id_no', '身份证号'),
+      F('is_fulltime', '专职驾驶员', { type: 'bool', def: 1 }),
+      F('license_no', '驾驶证号'),
+      F('license_class', '准驾车型', { type: 'select', options: ['A1', 'A2', 'A3', 'B1', 'B2', 'C1', 'C2', '其他'] }),
+      F('license_first', '初次领证日期', { type: 'date' }),
+      F('license_expire', '驾驶证有效期止', { type: 'date' }),
+      F('hire_date', '入职日期', { type: 'date' }),
+      F('active', '在岗', { type: 'bool', def: 1 }),
+      F('notes', '备注', { full: 1 }),
+    ],
+  },
+  driver_training: {
+    title: '安全培训', table: 'driver_training', icon: '📚',
+    hint: '车辆管理办法第九条：院交通安全领导小组定期召开交通安全会议，做到有布置、有落实、有检查。此处即"有落实"的记录载体。',
+    columns: [['train_date', '日期'], ['topic', '主题'], ['trainer', '主讲'], ['attendees', '参训人数', 'num'], ['hours', '学时', 'num']],
+    fields: [
+      F('train_date', '培训日期', { type: 'date', req: 1 }),
+      F('topic', '培训主题', { req: 1, full: 1 }),
+      F('trainer', '主讲人'),
+      F('driver_ids', '参训司机（姓名，逗号分隔）', { full: 1 }),
+      F('attendees', '参训人数', { type: 'number' }),
+      F('hours', '学时', { type: 'number' }),
+      F('material', '培训材料', { full: 1 }),
+      F('notes', '备注', { full: 1 }),
+    ],
+    attach: 1,
   },
   vehicle: {
     title: '车辆档案', table: 'vehicle', icon: '🚗',
@@ -490,6 +521,9 @@ const MODULES = {
         options: ['油费', '充电费', '维修费', '通行费', '保险费', '年检费', '班车租赁费', '其他'],
       }),
       F('sub_type', '子类（保险填交强险/商业险；班车填固定或临时租用）', { full: 1 }),
+      F('billing_mode', '计费方式（班车用）', { type: 'select', options: ['按月包干', '按天座计费'] }),
+      F('seats', '座位数（临时用车）', { type: 'number' }),
+      F('days', '使用天数（临时用车）', { type: 'number' }),
       F('vehicle_id', '关联车辆', { type: 'ref', ref: 'vehicle', show: 'plate', full: 1 }),
       F('driver_id', '关联司机', { type: 'ref', ref: 'driver', show: 'name', full: 1 }),
       F('plate', '车牌（车辆已报废时手填留痕）'),
@@ -694,8 +728,14 @@ const NAV = [
     ['repair', '房屋事务', 'Affairs', 'asset'],
     ['property_fee', '房屋收支', 'Ledger', 'fee'],
   ] },
-  // 司机补助并入车务支出——它是车务开支的一个来源，不该与其他开支分列
-  { group: '车辆与司机', items: [['trip_record', '行车记录', 'Trip Records', 'trip'], ['vehicle_expense', '车务支出', 'Vehicle Costs', 'fee'], ['driver', '司机档案', 'Drivers', 'driver'], ['vehicle', '车辆档案', 'Vehicles', 'vehicle']] },
+  // 五层：权（车是谁的、证照）→ 用（谁在用）→ 事（对车做什么）→ 司机 → 支出
+  // 班车是外包服务不是资产，故不入车辆档案，只在用车管理与支出中体现
+  { group: '车辆与司机', items: [
+    ['vehicle', '车辆档案', 'Vehicles', 'vehicle'],
+    ['trip_record', '用车管理', 'Trips', 'trip'],
+    ['driver', '司机管理', 'Drivers', 'driver'],
+    ['vehicle_expense', '车务支出', 'Vehicle Costs', 'fee'],
+  ] },
   // 采购台账 → 合同管理 → 固定资产，按"采购—签约—形成资产"的实际流程排
   { group: '采购与资产', items: [['procurement', '采购台账', 'Procurement', 'cart'], ['contract', '合同管理', 'Contracts', 'contract'], ['asset', '固定资产', 'Assets', 'asset']] },
   { group: '节能管理', items: [['energy_summary', '能耗汇总', 'Energy Summary', 'energy'], ['energy_reading', '能耗台账', 'Energy Ledger', 'energy'], ['energy_activity', '节能宣传', 'Energy Programs', 'megaphone']] },
@@ -754,6 +794,8 @@ function route() {
   if (key === 'property_fee') return viewLedger();
   if (key === 'repair') return viewRepair();
   if (key === 'vehicle_expense') return viewVehicleCost();
+  if (key === 'trip_record') return viewTripMgmt();
+  if (key === 'driver') return viewDriverMgmt();
   if (key === 'subsidy') return viewSubsidy();
   if (key === 'energy_summary') return viewEnergySummary();
   if (key === 'obligations') return viewObligations();
@@ -849,6 +891,98 @@ td.lbl{width:110px;background:#f5f5f5;text-align:center;white-space:nowrap}
   w.document.close();
 }
 
+/* 用层：谁在用、干什么用。班车是外包服务，不在车辆档案里，但每天在跑，
+   所以它的运行情况属于"用"，与自有车的行车记录并列。 */
+async function viewTripMgmt() {
+  setTitle('trip_record', '用车管理');
+  const sub = viewTripMgmt._sub || 'trip';
+  viewTripMgmt._sub = sub;
+
+  const actions = $('#topbar-actions'); actions.innerHTML = '';
+  if (sub === 'trip') {
+    const b = el(`<button class="btn primary">${icon('plus')}新增行车记录</button>`);
+    b.onclick = () => openForm('trip_record', null);
+    actions.appendChild(b);
+  }
+
+  const view = $('#view');
+  const tab = (k, l) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${l}</button>`;
+  view.innerHTML = `
+    <div class="segbar">${tab('trip', '📋 行车记录')}${tab('shuttle', '🚌 班车运行')}</div>
+    <div id="tm-body"><div class="empty">加载中…</div></div>`;
+  view.querySelectorAll('[data-sub]').forEach(x => x.onclick = () => { viewTripMgmt._sub = x.dataset.sub; viewTripMgmt(); });
+
+  if (sub === 'shuttle') return renderShuttle($('#tm-body'));
+  await renderModuleTable('trip_record', $('#tm-body'));
+}
+
+async function renderShuttle(body) {
+  body.innerHTML = '<div class="empty">加载中…</div>';
+  const rows = ((await api.get('/vehicle_expense')) || [])
+    .filter(e => e.category === '班车租赁费');
+  const fixed = rows.filter(e => (e.sub_type || '').includes('固定'));
+  const temp = rows.filter(e => (e.sub_type || '').includes('临时'));
+  const sum = (a) => a.reduce((x, e) => x + (e.amount || 0), 0);
+
+  const tbl = (list, isTemp) => list.length ? `
+    <table class="sub"><thead><tr>
+      <th>年度</th><th>期间</th><th>服务方</th>
+      ${isTemp ? '<th class="num">座位</th><th class="num">天数</th><th class="num">单价</th>' : '<th>计费方式</th>'}
+      <th class="num">金额</th><th>状态</th></tr></thead>
+    <tbody>${list.map(e => `<tr>
+      <td>${e.year}</td><td class="muted">${esc(e.period || '')}</td>
+      <td>${esc(e.counterparty || '')}</td>
+      ${isTemp ? `<td class="num">${e.seats ?? ''}</td><td class="num">${e.days ?? ''}</td><td class="num">${e.unit_price ?? ''}</td>`
+               : `<td>${esc(e.billing_mode || '按月包干')}</td>`}
+      <td class="num">${money(e.amount)}</td>
+      <td><span class="tag ${['已付', '已结清'].includes(e.state) ? 'ok' : 'warn'}">${esc(e.state || '')}</span></td>
+    </tr>`).join('')}</tbody></table>` : '<div class="empty">暂无记录</div>';
+
+  body.innerHTML = `
+    <div class="hint">班车是<b>外包服务</b>，不属院车辆资产，故不在车辆档案中。
+      固定路线每天运行、按月结算；临时用车按天计，金额 = 座位数 × 使用天数 × 合同单价。</div>
+    <div class="mini-cards">
+      <div class="mini-card"><div class="mk-k">固定路线</div><div class="mk-v">${wan(sum(fixed))}<small> 万</small></div></div>
+      <div class="mini-card"><div class="mk-k">临时用车</div><div class="mk-v">${wan(sum(temp))}<small> 万</small></div></div>
+      <div class="mini-card"><div class="mk-k">合计</div><div class="mk-v">${wan(sum(rows))}<small> 万</small></div></div>
+    </div>
+    <div class="panel"><div class="panel-h"><h2>🚌 固定路线（上下班）</h2>
+      <span class="hint" style="margin:0">按月结算</span></div>
+      <div class="panel-b"><div style="overflow-x:auto">${tbl(fixed, false)}</div></div></div>
+    <div class="panel"><div class="panel-h"><h2>🚐 临时用车（外出活动）</h2>
+      <span class="hint" style="margin:0">按天 × 座位计费</span></div>
+      <div class="panel-b"><div style="overflow-x:auto">${tbl(temp, true)}</div></div></div>`;
+}
+
+/* 司机管理：档案（含驾驶证）/ 安全培训 / 出车补助。
+   违章按 2026-07-31 确认不入系统、由司机自负；若因违规扣补助，
+   在补助记录的"其他说明"里写明理由即可，否则财务对账说不清。 */
+async function viewDriverMgmt() {
+  setTitle('driver', '司机管理');
+  const sub = viewDriverMgmt._sub || 'file';
+  viewDriverMgmt._sub = sub;
+
+  const ADD = { file: ['driver', '司机'], training: ['driver_training', '培训记录'] };
+  const actions = $('#topbar-actions'); actions.innerHTML = '';
+  if (ADD[sub]) {
+    const b = el(`<button class="btn primary">${icon('plus')}新增${ADD[sub][1]}</button>`);
+    b.onclick = () => openForm(ADD[sub][0], null);
+    actions.appendChild(b);
+  }
+
+  const view = $('#view');
+  const tab = (k, l) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${l}</button>`;
+  view.innerHTML = `
+    <div class="segbar">${tab('file', '🧑‍✈️ 司机档案')}${tab('training', '📚 安全培训')}${tab('subsidy', '💴 出车补助')}</div>
+    <div id="dm-body"><div class="empty">加载中…</div></div>`;
+  view.querySelectorAll('[data-sub]').forEach(x => x.onclick = () => { viewDriverMgmt._sub = x.dataset.sub; viewDriverMgmt(); });
+
+  const body = $('#dm-body');
+  if (sub === 'subsidy') return viewSubsidy(body);
+  if (sub === 'training') return renderModuleTable('driver_training', body);
+  await renderModuleTable('driver', body);
+}
+
 /* ---------- 车务支出 ---------- */
 const VEH_CAT = {
   '油费': '⛽', '充电费': '🔌', '维修费': '🔧', '通行费': '🛣️',
@@ -870,7 +1004,7 @@ async function viewVehicleCost() {
   const view = $('#view');
   const tab = (k, l) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${l}</button>`;
   view.innerHTML = `
-    <div class="segbar">${tab('overview', '📊 支出总览')}${tab('detail', '📑 支出明细')}${tab('bycar', '🚗 单车成本')}${tab('subsidy', '👤 司机补助')}</div>
+    <div class="segbar">${tab('overview', '📊 支出总览')}${tab('detail', '📑 支出明细')}${tab('bycar', '🚗 单车成本')}${tab('alloc', '🏢 部门归集')}${tab('subsidy', '👤 司机补助')}</div>
     <div id="vc-body"><div class="empty">加载中…</div></div>`;
   view.querySelectorAll('[data-sub]').forEach(x => x.onclick = () => { viewVehicleCost._sub = x.dataset.sub; viewVehicleCost(); });
 
@@ -883,6 +1017,7 @@ async function viewVehicleCost() {
 
   if (sub === 'overview') return renderVehOverview(body, years, yr);
   if (sub === 'bycar') return renderVehByCar(body, yr);
+  if (sub === 'alloc') return renderVehAlloc(body, yr);
   return renderVehDetail(body, yr);
 }
 
@@ -981,6 +1116,59 @@ async function renderVehDetail(body, yr) {
     const q = e.target.value.trim().toLowerCase();
     draw(q ? sorted.filter(r => Object.values(r).some(v => String(v ?? '').toLowerCase().includes(q))) : sorted);
   };
+}
+
+/* 部门归集：所有车务费用由院支出、后勤管理处代管代统计，
+   按 3 元/公里向部门名义分摊（内部转账、不走真实资金），每年年底结算一次。
+   注：车辆管理办法第六条原文为"每半年汇总"，实际执行为每年一次。 */
+async function renderVehAlloc(body, yr) {
+  const [rows, cmp] = await Promise.all([
+    api.get(`/rpc/vehicle_dept_alloc?p_year=${yr}`),
+    api.get('/rpc/vehicle_alloc_vs_cost'),
+  ]);
+  const list = rows || [];
+  const c = (cmp || []).find(x => x.year === yr) || {};
+  const rate = list[0]?.rate || 3;
+  const totKm = list.reduce((a, r) => a + Number(r.km), 0);
+  const totAmt = list.reduce((a, r) => a + Number(r.alloc_amt), 0);
+  const gap = Number(c.gap || 0);
+
+  body.innerHTML = `
+    <div class="hint">车务费用全部由院支出、后勤管理处代管代统计，按 <b>${rate} 元/公里</b>
+      向用车部门名义分摊（<b>内部转账，不走真实资金</b>），每年年底结算一次。
+      <br>注：《车辆管理办法》电标物〔2017〕386号 第六条原文为"每半年汇总各部门用车费用"，
+      实际执行为每年一次，此处以实际执行为准。</div>
+    <div class="mini-cards">
+      <div class="mini-card"><div class="mk-k">用车部门</div><div class="mk-v">${list.length}<small> 个</small></div></div>
+      <div class="mini-card"><div class="mk-k">总里程</div><div class="mk-v">${totKm.toLocaleString('zh-CN')}<small> km</small></div></div>
+      <div class="mini-card"><div class="mk-k">名义分摊</div><div class="mk-v">${wan(totAmt)}<small> 万</small></div></div>
+      <div class="mini-card"><div class="mk-k">实际支出</div><div class="mk-v">${wan(c.cost_total)}<small> 万</small></div></div>
+      <div class="mini-card"><div class="mk-k">院自行消化</div>
+        <div class="mk-v" style="color:${gap > 0 ? 'var(--danger)' : 'inherit'}">${wan(gap)}<small> 万</small></div></div>
+    </div>
+    ${gap > 0 ? `<div class="hint" style="border-color:var(--danger)">
+      实际支出比按里程分摊出去的多 <b>${wan(gap)}</b> 万元。差额主要来自无法归到具体用车的固定成本
+      （班车租赁、保险、年检、司机补助等），这部分由院自行消化。若要求全额由部门承担，
+      需对这部分另行按里程比例二次分摊。</div>` : ''}
+    <div class="panel"><div class="panel-b"><div style="overflow-x:auto">
+      <table><thead><tr>
+        <th>用车部门</th><th class="num">用车次数</th><th class="num">里程 km</th>
+        <th class="num">单价</th><th class="num">名义分摊额</th><th class="num">占比</th></tr></thead>
+      <tbody>${list.length ? list.map(r => `<tr>
+        <td><b>${esc(r.dept)}</b></td>
+        <td class="num">${r.trips}</td>
+        <td class="num">${Number(r.km).toLocaleString('zh-CN')}</td>
+        <td class="num muted">${r.rate}</td>
+        <td class="num">${money(r.alloc_amt)}</td>
+        <td class="num muted">${totAmt ? (Number(r.alloc_amt) / totAmt * 100).toFixed(1) + '%' : ''}</td>
+      </tr>`).join('') : '<tr><td colspan="6"><div class="empty">该年度暂无行车记录</div></td></tr>'}
+      ${list.length ? `<tr style="background:var(--surface-dim);font-weight:700">
+        <td>合计 ${list.length} 个部门</td>
+        <td class="num">${list.reduce((a, r) => a + Number(r.trips), 0)}</td>
+        <td class="num">${totKm.toLocaleString('zh-CN')}</td><td></td>
+        <td class="num">${money(totAmt)}</td><td></td></tr>` : ''}
+      </tbody></table>
+    </div></div></div>`;
 }
 
 async function renderVehByCar(body, yr) {
