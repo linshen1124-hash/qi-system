@@ -9,8 +9,10 @@
      ⚠️ 部署后必须用随机串绕缓存核对源站是否已更新，再核对 ?v= 这个 URL。
      index.html 是 no-cache、js/css 是 24h，两者传播有先后；若在源站尚未更新的
      窗口内有人请求了新版本号，边缘会把旧文件缓存到新 URL 下，锁死 24 小时。
-     出现这种情况只能再升一位版本号（换一个从未被缓存过的 key）。 -->
-<link rel="stylesheet" href="/style.css?v=17">
+     出现这种情况只能再升一位版本号（换一个从未被缓存过的 key）。
+     2026-07-31 起 _headers 已把 js/css 从 24h 降为 max-age=300+must-revalidate，
+     即便再撞上传播窗口，最多 5 分钟自动纠正，不必人工补救。 -->
+<link rel="stylesheet" href="/style.css?v=18">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -48,6 +50,6 @@
 <div id="modal-root"></div>
 <div id="toast"></div>
 
-<script src="/app.js?v=17"></script>
+<script src="/app.js?v=18"></script>
 </body>
 </html>

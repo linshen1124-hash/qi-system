@@ -8,11 +8,20 @@
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
 
-# CSS & JS — cache for 1 day (fingerprint via query param for cache busting)
+# CSS & JS —— 短缓存 + 必须回源校验
+#
+# 原为 max-age=86400（24小时）。该配置已踩过两次同一个坑：
+# index.html 是 no-cache、js/css 是 24h，两者部署传播有先后；若在源站尚未
+# 更新完的窗口内有人请求了新版本号 URL（?v=N），边缘会把「旧文件」缓存到
+# 「新 key」下并锁死 24 小时——升版本号这个手段本身就失效了，
+# 只能再升一位换个从未被缓存过的 key。
+#
+# 改为 max-age=300 + must-revalidate：即便撞上传播窗口，最多 5 分钟自动纠正，
+# 不必人工补救。?v= 仍保留，用于让浏览器本地缓存立即失效。
 /*.css
-  Cache-Control: public, max-age=86400
+  Cache-Control: public, max-age=300, must-revalidate
 /*.js
-  Cache-Control: public, max-age=86400
+  Cache-Control: public, max-age=300, must-revalidate
 
 # HTML — never cache (SPA)
 /*.html
