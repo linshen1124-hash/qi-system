@@ -1003,7 +1003,7 @@ async function renderShuttle(body) {
    在补助记录的"其他说明"里写明理由即可，否则财务对账说不清。 */
 async function viewDriverMgmt() {
   setTitle('driver', '司机管理');
-  const sub = viewDriverMgmt._sub || 'file';
+  const sub = viewDriverMgmt._sub || 'overview';
   viewDriverMgmt._sub = sub;
 
   const ADD = { file: ['driver', '司机'], training: ['driver_training', '培训记录'] };
@@ -1017,14 +1017,178 @@ async function viewDriverMgmt() {
   const view = $('#view');
   const tab = (k, l) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${l}</button>`;
   view.innerHTML = `
-    <div class="segbar">${tab('file', '🧑‍✈️ 司机档案')}${tab('training', '📚 安全培训')}${tab('subsidy', '💴 出车补助')}</div>
+    <div class="segbar">${tab('overview', '📊 总览')}${tab('file', '🧑‍✈️ 司机档案')}${tab('training', '📚 安全培训')}${tab('subsidy', '💴 出车补助')}</div>
     <div id="dm-body"><div class="empty">加载中…</div></div>`;
   view.querySelectorAll('[data-sub]').forEach(x => x.onclick = () => { viewDriverMgmt._sub = x.dataset.sub; viewDriverMgmt(); });
 
   const body = $('#dm-body');
+  if (sub === 'overview') return renderDriverOverview(body);
   if (sub === 'subsidy') return viewSubsidy(body);
   if (sub === 'training') return renderModuleTable('driver_training', body);
   await renderModuleTable('driver', body);
+}
+
+/* 司机日程：数据源是行车记录（事后实绩），不是用车单（事前预约）——
+   经确认当前只需回顾视角。若日后要做排班调度，需另建用车单表。 */
+async function renderDriverOverview(body) {
+  body.innerHTML = '<div class="empty">加载中…</div>';
+  const [trips, drivers, trainings] = await Promise.all([
+    api.get('/trip_record'), api.get('/driver'), api.get('/driver_training'),
+  ]);
+  const T = trips || [], D = drivers || [], TR = trainings || [];
+
+  const st = renderDriverOverview;
+  const last = T.map(t => t.date).filter(Boolean).sort().pop();
+  if (!st._ym) {
+    const d = last ? new Date(last) : new Date();
+    st._ym = { y: d.getFullYear(), m: d.getMonth() + 1 };
+  }
+  st._filter = st._filter || '';       // 按司机筛选，空串为全部
+  st._open = st._open || {};           // 单元格展开状态：一天多趟时叠加显示、超出可展开
+
+  const ym = st._ym;
+  const pad = (n) => String(n).padStart(2, '0');
+  const key = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
+  const nameOf = (t) => t.driver_name || (D.find(x => x.id === t.driver_id) || {}).name || '—';
+
+  const inMonth = T.filter(t => t.date && t.date.startsWith(`${ym.y}-${pad(ym.m)}`));
+  const shown = st._filter ? inMonth.filter(t => nameOf(t) === st._filter) : inMonth;
+  const byDay = {};
+  shown.forEach(t => (byDay[t.date] ||= []).push(t));
+
+  const sel = st._sel && byDay[st._sel] ? st._sel
+    : Object.keys(byDay).sort()[0] || '';
+  st._sel = sel;
+
+  const km = shown.reduce((a, t) => a + (t.km || 0), 0);
+  const ot = shown.reduce((a, t) => a + (t.overtime_h || 0), 0);
+  const active = D.filter(d => d.active !== false);
+  const noLicense = active.filter(d => !d.license_expire);
+  const yearTr = TR.filter(x => (x.train_date || '').startsWith(String(ym.y)));
+
+  // 补助按 setting 的标准估算，与「出车补助」页同口径
+  const est = shown.reduce((a, t) => a + (t.km || 0) * 0.25 + (t.overtime_h || 0) * 20, 0);
+
+  const DOW = ['一', '二', '三', '四', '五', '六', '日'];
+  const first = new Date(ym.y, ym.m - 1, 1);
+  const lead = (first.getDay() + 6) % 7;
+  const days = new Date(ym.y, ym.m, 0).getDate();
+
+  const cellHtml = (d) => {
+    const k = key(ym.y, ym.m, d);
+    const list = byDay[k] || [];
+    if (!list.length) return `<div class="cal-cell"><span class="cal-d muted">${d}</span></div>`;
+    const open = st._open[k];
+    const CAP = 2;
+    const vis = open ? list : list.slice(0, CAP);
+    return `<div class="cal-cell has ${k === sel ? 'sel' : ''}" data-day="${k}">
+      <span class="cal-d">${d}</span>
+      ${vis.map(t => `<span class="cal-t" title="${esc(nameOf(t))} ${esc(t.plate || '')} ${esc(t.route || '')}">${esc(nameOf(t))}</span>`).join('')}
+      ${list.length > CAP ? `<span class="cal-more" data-more="${k}">${open ? '收起' : '+' + (list.length - CAP)}</span>` : ''}
+    </div>`;
+  };
+
+  const dayList = byDay[sel] || [];
+  const dayKm = dayList.reduce((a, t) => a + (t.km || 0), 0);
+  const dayOt = dayList.reduce((a, t) => a + (t.overtime_h || 0), 0);
+
+  body.innerHTML = `
+    <div class="mini-cards">
+      <div class="mini-card"><div class="mk-k">在岗司机</div><div class="mk-v">${active.length}<small> 人</small></div></div>
+      <div class="mini-card"><div class="mk-k">证照待录</div>
+        <div class="mk-v" style="color:${noLicense.length ? 'var(--danger)' : 'inherit'}">${noLicense.length}<small> 人</small></div></div>
+      <div class="mini-card"><div class="mk-k">本月出车</div><div class="mk-v">${shown.length}<small> 次 · ${km} km</small></div></div>
+      <div class="mini-card"><div class="mk-k">本月补助</div><div class="mk-v">${Math.round(est)}<small> 元</small></div></div>
+    </div>
+    ${noLicense.length ? `<div class="hint" style="border-color:var(--danger)">
+      ${noLicense.length} 位在岗司机未录驾驶证有效期，「驾驶证到期换证」红线规则因此无法触发。
+      驾驶证过期继续驾驶即无证驾驶（车辆管理办法第十条）。</div>` : ''}
+
+    <div class="panel">
+      <div class="panel-h">
+        <h2><span class="ic">${icon('todo')}</span>司机日程</h2>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn sm" id="cal-prev">◀</button>
+          <span style="font-size:14px;font-weight:700;min-width:96px;text-align:center">${ym.y} 年 ${ym.m} 月</span>
+          <button class="btn sm" id="cal-next">▶</button>
+        </div>
+      </div>
+      <div class="panel-b" style="padding:14px 18px 18px">
+        <div class="cal-filter">
+          <button class="chip ${!st._filter ? 'on' : ''}" data-f="">全部</button>
+          ${active.map(d => `<button class="chip ${st._filter === d.name ? 'on' : ''}" data-f="${esc(d.name)}">${esc(d.name)}</button>`).join('')}
+        </div>
+        <div class="cal-dow">${DOW.map(x => `<span>${x}</span>`).join('')}</div>
+        <div class="cal-grid">
+          ${Array.from({ length: lead }, () => '<div></div>').join('')}
+          ${Array.from({ length: days }, (_, i) => cellHtml(i + 1)).join('')}
+        </div>
+        <div class="cal-detail">
+          ${sel ? `
+            <div class="cal-dh"><b>${esc(sel)}</b>
+              <span class="muted">${dayList.length} 次出车 · ${dayKm} km · 加班 ${dayOt} 小时</span></div>
+            ${dayList.map(t => `<div class="cal-row">
+              <span class="cal-av">${esc(nameOf(t).slice(0, 1))}</span>
+              <b style="width:60px;flex:none">${esc(nameOf(t))}</b>
+              <span class="muted" style="width:82px;flex:none">${esc(t.plate || '')}</span>
+              <span class="muted" style="width:78px;flex:none">${esc(t.dept || '')}</span>
+              <span class="muted" style="flex:1;min-width:0">${esc(t.route || '')}</span>
+              <span class="muted" style="flex:none">${esc(t.passenger || '')}</span>
+              <span style="flex:none">${t.km || 0} km</span>
+              ${t.overtime_h ? `<span class="tag warn" style="flex:none">加班 ${t.overtime_h}h</span>` : ''}
+            </div>`).join('')}`
+            : '<div class="empty">本月无出车记录</div>'}
+        </div>
+      </div>
+    </div>
+
+    <div class="dm-sum">
+      <div class="panel" style="margin:0">
+        <div class="panel-h"><h2 style="font-size:15px">🧑‍✈️ 司机档案</h2></div>
+        <div class="panel-b" style="padding:14px 18px;font-size:13px;line-height:1.9">
+          专职 ${active.filter(d => d.is_fulltime !== false).length} · 兼职 ${active.filter(d => d.is_fulltime === false).length}<br>
+          ${noLicense.length ? `<span style="color:var(--danger)">驾驶证信息 ${noLicense.length} 人未录</span>`
+            : '驾驶证信息完整'}<br>
+          <span class="muted">在岗合计 ${active.length} 人</span>
+        </div>
+      </div>
+      <div class="panel" style="margin:0">
+        <div class="panel-h"><h2 style="font-size:15px">📚 安全培训</h2></div>
+        <div class="panel-b" style="padding:14px 18px;font-size:13px;line-height:1.9">
+          ${ym.y} 年 ${yearTr.length} 场 · ${yearTr.reduce((a, x) => a + (x.hours || 0), 0)} 学时<br>
+          ${yearTr.length ? `最近 ${esc(yearTr.map(x => x.train_date).sort().pop())}`
+            : '<span style="color:var(--warn)">尚无培训记录</span>'}<br>
+          <span class="muted">办法第九条要求定期开展</span>
+        </div>
+      </div>
+      <div class="panel" style="margin:0">
+        <div class="panel-h"><h2 style="font-size:15px">💴 出车补助</h2></div>
+        <div class="panel-b" style="padding:14px 18px;font-size:13px;line-height:1.9">
+          本月估算 ${Math.round(est)} 元<br>
+          里程 ${Math.round(km * 0.25)} + 加班 ${Math.round(ot * 20)}<br>
+          <span class="muted">实际以「出车补助」页结算为准</span>
+        </div>
+      </div>
+    </div>`;
+
+  const rerender = () => renderDriverOverview(body);
+  body.querySelector('#cal-prev').onclick = () => {
+    ym.m--; if (ym.m < 1) { ym.m = 12; ym.y--; } st._sel = null; rerender();
+  };
+  body.querySelector('#cal-next').onclick = () => {
+    ym.m++; if (ym.m > 12) { ym.m = 1; ym.y++; } st._sel = null; rerender();
+  };
+  body.querySelectorAll('[data-f]').forEach(b => b.onclick = () => {
+    st._filter = b.dataset.f; st._sel = null; rerender();
+  });
+  body.querySelectorAll('[data-day]').forEach(c => c.onclick = (e) => {
+    if (e.target.closest('[data-more]')) return;
+    st._sel = c.dataset.day; rerender();
+  });
+  body.querySelectorAll('[data-more]').forEach(m => m.onclick = (e) => {
+    e.stopPropagation();
+    st._open[m.dataset.more] = !st._open[m.dataset.more]; rerender();
+  });
 }
 
 /* 事层：对车做了什么。六类事项各有制度依据（车辆管理办法 电标物〔2017〕386号）：
