@@ -239,6 +239,7 @@ const MODULES = {
       F('mortgage_state', '抵押状态', { type: 'select', options: ['未抵押', '已抵押', '已解除抵押'] }),
       F('body_color', '车身颜色'),
       F('plate_color', '号牌颜色', { type: 'select', options: ['蓝色', '黄色', '黄绿渐变（新能源）', '白色', '黑色'] }),
+      F('reg_cert_owner', '证书载明所有人', { full: 1 }),
       F('reg_cert_file', '登记证书扫描件', { full: 1 }),
       F('model_code', '车辆型号（证书第7项）'),
       F('manufacturer', '制造厂名称'),
@@ -1337,6 +1338,9 @@ async function viewVehicle() {
   const kv = (rows) => `<div class="cert-meta">${rows
     .map(([k, v, full]) => `<span class="${full ? 'full' : ''}"><b>${k}</b> ${v}</span>`).join('')}</div>`;
 
+  // 登记证书载明的所有人若不是现单位名，处置/理赔/抵押时会卡住——所以单独标红
+  const oldName = (c) => !!c.reg_cert_owner && !/^中国电子技术标准化研究院/.test(c.reg_cert_owner);
+
   const regsOf = (id) => (regs || []).filter(r => r.vehicle_id == id)
     .sort((a, b) => String(a.reg_date || '').localeCompare(String(b.reg_date || '')));
 
@@ -1374,6 +1378,7 @@ async function viewVehicle() {
             <span class="muted">${c.reg_cert_no
               ? '绿本 ' + esc(c.reg_cert_no)
               : '<span class="tag warn">无登记证书</span>'}</span>
+            ${oldName(c) ? '<span class="tag danger">证载旧单位名</span>' : ''}
             <span>年检 ${due(c.inspection_expire, '年检')}</span>
             <button class="btn link sm" data-edit-v="${c.id}">编辑</button>
             <span class="caret" id="caret-v${c.id}">▸</span>
@@ -1385,7 +1390,10 @@ async function viewVehicle() {
           ${kv([
             ['证书编号', V(c.reg_cert_no)],
             ['初次登记日期', V(c.first_reg_date)],
-            ['机动车所有人', V(c.owner_name)],
+            ['证载所有人', c.reg_cert_owner
+              ? (oldName(c) ? `<span class="tag danger">旧单位名</span> ${esc(c.reg_cert_owner)}` : esc(c.reg_cert_owner))
+              : dash, 1],
+            ['行驶证所有人', V(c.owner_name), 1],
             ['身份证明', c.owner_id_type ? esc(c.owner_id_type) + ' ' + esc(c.owner_id_no || '') : dash],
             ['车辆获得方式', V(c.acquire_way)],
             ['登记机关', V(c.reg_org)],
@@ -1465,6 +1473,7 @@ async function viewVehicle() {
     <div class="mini-cards">
       <div class="mini-card"><div class="mk-k">车辆</div><div class="mk-v">${list.length}<small> 辆</small></div></div>
       <div class="mini-card"><div class="mk-k">未录登记证书</div><div class="mk-v">${noCert}<small> 辆</small></div></div>
+      <div class="mini-card"><div class="mk-k">证载旧单位名</div><div class="mk-v">${list.filter(oldName).length}<small> 辆</small></div></div>
       <div class="mini-card"><div class="mk-k">年检已逾期</div><div class="mk-v">${overdue}<small> 辆</small></div></div>
       <div class="mini-card"><div class="mk-k">资产原值</div><div class="mk-v">${(value / 10000).toFixed(2)}<small> 万</small></div></div>
     </div>
