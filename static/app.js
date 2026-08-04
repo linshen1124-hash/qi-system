@@ -206,10 +206,12 @@ const MODULES = {
   },
   vehicle: {
     title: '车辆档案', table: 'vehicle', icon: '🚗',
-    columns: [['plate', '车牌号'], ['vehicle_type', '车辆类型'], ['model', '品牌型号'], ['vin', '车辆识别代号'], ['owner_name', '所有人'], ['registration_date', '注册日期'], ['active', '在用', 'bool']],
+    columns: [['plate', '车牌号'], ['brand', '品牌'], ['vehicle_type', '车辆类型'], ['use_nature_cn', '使用性质'], ['model', '厂牌型号'], ['vin', '车辆识别代号'], ['asset_no', '资产编号'], ['original_value', '资产原值', 'money'], ['registration_date', '注册日期'], ['active', '在用', 'bool']],
     fields: [
       F('plate', '号牌号码', { req: 1 }),
+      F('brand', '品牌'),
       F('vehicle_type', '车辆类型', { type: 'select', options: ['小型普通客车', '小型轿车', '大型货车', '中型客车', '大型客车', '摩托车', '其他'] }),
+      F('use_nature_cn', '使用性质（办法第四条）', { type: 'select', options: ['主要负责人用车', '老干部服务用车', '业务用车', '公务用车', '其他'] }),
       F('model', '品牌型号'),
       F('owner_name', '所有人'),
       F('owner_address', '住址', { full: 1 }),
@@ -228,8 +230,15 @@ const MODULES = {
       F('inspection_expire', '检验有效期至', { type: 'date' }),
       F('retirement_date', '强制报废期止', { type: 'date' }),
       F('active', '在用', { type: 'bool', def: 1 }),
+      F('asset_no', '院系统资产编号'),
+      F('integrated_no', '一体化编号'),
+      F('asset_ref_id', '一体化系统ID'),
+      F('batch_no', '批次号'),
+      F('original_value', '资产原值(元)', { type: 'number' }),
+      F('asset_manager', '资产管理人'),
       F('notes', '备注', { full: 1 }),
     ],
+    hint: '资产编号、一体化编号、原值来自院资产管理系统《现存实有车辆信息》；VIN 与发动机号为完整值。',
   },
   trip_record: {
     title: '行车记录', table: 'trip_record', icon: '🛣️',
@@ -661,6 +670,55 @@ const MODULES = {
       F('notes', '备注', { full: 1 }),
     ],
     attach: 1,
+  },
+  // 资产卡片（财务口径）。与 property（按幢）、property_cert（按证）是三套独立口径：
+  // 安定门 4 张房屋卡片合计 14759 + 面积调整 213.7 = 14972.70㎡，恰好等于房权证 030704
+  // 证载面积，但逐幢拆分方式与后勤台账不同，所以只在「证」一级关联，不逐幢对应。
+  asset_card: {
+    title: '资产卡片', table: 'asset_card', icon: '📇',
+    hint: '院资产管理系统（财务）口径的房产与土地台账。与幢台账颗粒度不同，只作关联不作合并——两边面积对不上属正常，对不上的是拆分方式而非总数。',
+    columns: [
+      ['asset_no', '资产编号'], ['asset_name', '资产名称'], ['acct_subject', '会计科目'],
+      ['category', '资产分类'], ['area', '数量/面积', 'num'], ['unit', '单位'],
+      ['original_value', '资产原值', 'money'], ['accum_depr', '累计折旧/摊销', 'money'],
+      ['cert_no_txt', '房产证号'], ['location', '坐落位置'],
+    ],
+    fields: [
+      F('asset_no', '资产编号', { req: 1 }),
+      F('asset_name', '资产名称', { req: 1 }),
+      F('group_name', '台账分组'),
+      F('sys_asset_name', '院系统资产名称'),
+      F('acct_subject', '单位会计科目', { type: 'select', options: ['固定资产', '无形资产'] }),
+      F('category', '资产分类'),
+      F('category_code', '资产分类代码'),
+      F('asset_class', '资产门类'),
+      F('has_cert', '有无房产证', { type: 'select', options: ['无房产证'] }),
+      F('cert_no_txt', '房产证号（台账原文）', { full: 1 }),
+      F('cert_count', '证载幢数', { type: 'number' }),
+      F('original_value', '资产原值(元)', { type: 'number' }),
+      F('accum_depr', '累计折旧/摊销(元)', { type: 'number' }),
+      F('area', '数量/面积', { type: 'number' }),
+      F('area_adjust', '面积调整', { type: 'number' }),
+      F('unit', '数量计量单位'),
+      F('location', '坐落位置', { full: 1 }),
+      F('acquire_way', '取得方式', { type: 'select', options: ['自建', '新购', '盘盈', '划拨', '接收'] }),
+      F('acquire_date', '取得日期', { type: 'date' }),
+      F('acct_date', '记账日期', { type: 'date' }),
+      F('voucher_no', '记账凭证号'),
+      F('fin_status', '财务入账状态'),
+      F('dep_months', '折旧/摊销年限(月)', { type: 'number' }),
+      F('dep_used_months', '已提月数', { type: 'number' }),
+      F('inventory_no', '清查编号'),
+      F('purchase_form', '采购组织形式'),
+      F('manage_dept', '管理部门'),
+      F('owner_unit', '产权单位'),
+      F('asset_status', '资产状态', { type: 'select', options: ['在用', '闲置', '待处置', '已处置'] }),
+      F('asset_use', '资产用途'),
+      F('cert_id', '关联房产证', { type: 'ref', ref: 'property_cert', show: 'cert_no', full: 1 }),
+      F('property_id', '关联幢', { type: 'ref', ref: 'property', show: 'building', full: 1 }),
+      F('source_file', '数据来源', { full: 1 }),
+      F('notes', '备注', { full: 1 }),
+    ],
   },
   // 幢（子）。挂在房产证下面，也允许 cert_id 为空——未登记建筑就是这种。
   property: {
@@ -1803,7 +1861,7 @@ async function viewProperty() {
   const view = $('#view');
   const tab = (k, l) => `<button class="seg-btn ${k === sub ? 'active' : ''}" data-sub="${k}">${l}</button>`;
   view.innerHTML = `
-    <div class="segbar">${tab('cert', '🏛️ 自有产权')}${tab('rent', '🔑 租入')}${tab('borrow', '🤲 借用代管')}${tab('lease', '📜 租约台账')}</div>
+    <div class="segbar">${tab('cert', '🏛️ 自有产权')}${tab('rent', '🔑 租入')}${tab('borrow', '🤲 借用代管')}${tab('lease', '📜 租约台账')}${tab('asset', '📇 资产卡片')}</div>
     <div id="pv-body"><div class="empty">加载中…</div></div>`;
   view.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => { viewProperty._sub = b.dataset.sub; viewProperty(); });
 
@@ -1813,6 +1871,12 @@ async function viewProperty() {
     b.onclick = () => openForm('lease', null);
     actions.appendChild(b);
     return renderModuleTable('lease', $('#pv-body'));
+  }
+  if (sub === 'asset') {
+    const b = el(`<button class="btn primary">${icon('plus')}新增资产卡片</button>`);
+    b.onclick = () => openForm('asset_card', null);
+    actions.appendChild(b);
+    return renderModuleTable('asset_card', $('#pv-body'));
   }
   if (sub === 'rent' || sub === 'borrow') {
     const t = sub === 'rent' ? '租入' : '借用代管';
