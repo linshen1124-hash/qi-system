@@ -1341,6 +1341,21 @@ async function viewVehicle() {
   // 登记证书载明的所有人若不是现单位名，处置/理赔/抵押时会卡住——所以单独标红
   const oldName = (c) => !!c.reg_cert_owner && !/^中国电子技术标准化研究院/.test(c.reg_cert_owner);
 
+  // 号牌颜色不是录进来的，是按卡片上的证载数据推出来的：
+  //   绿（新能源）—— 燃料种类为电/氢；
+  //   黄 —— 大型或中型客车、核定载客≥10 人、车长≥6000mm 任一成立；
+  //   蓝 —— 其余小型车。
+  // 不落库是刻意的：证件上不印号牌颜色，存下来就成了猜测冒充事实；
+  // 现在数据一改颜色自己跟着变。
+  const plateKind = (c) => {
+    const fuel = c.fuel_type || '';
+    if (/电|氢|燃料电池/.test(fuel) && !/汽油|柴油/.test(fuel)) return ['green', '绿牌 · 新能源'];
+    const len = parseInt(String(c.dimensions || '').split(/[Xx×*]/)[0], 10) || 0;
+    if (/大型|中型/.test(c.vehicle_type || '') || (c.seating_capacity || 0) >= 10 || len >= 6000)
+      return ['yellow', '黄牌 · 大中型'];
+    return ['blue', '蓝牌 · 小型'];
+  };
+
   const regsOf = (id) => (regs || []).filter(r => r.vehicle_id == id)
     .sort((a, b) => String(a.reg_date || '').localeCompare(String(b.reg_date || '')));
 
@@ -1364,13 +1379,15 @@ async function viewVehicle() {
 
   const card = (c) => {
     const rs = regsOf(c.id);
+    const [pk, pkLabel] = plateKind(c);
     return `
-      <div class="panel" style="margin-bottom:14px">
+      <div class="panel pl-${pk}" style="margin-bottom:14px">
         <div class="panel-h" style="cursor:pointer" data-toggle="v${c.id}">
           <h2 style="font-size:15px">
             <span class="ic">${icon('vehicle')}</span>
             ${esc(c.plate)}
-            ${c.brand ? `<span class="tag">${esc(c.brand)}</span>` : ''}
+            <span class="plate-chip pc-${pk}">${esc(pkLabel)}</span>
+            ${c.brand ? `<span class="tag">${esc(c.brand)}${c.model_code ? ' ' + esc(c.model_code) : ''}</span>` : ''}
             ${c.use_nature_cn ? `<span class="tag ct-house">${esc(c.use_nature_cn)}</span>` : ''}
             ${c.active === false ? '<span class="tag danger">已停用</span>' : ''}
           </h2>
@@ -1437,7 +1454,11 @@ async function viewVehicle() {
             ['转向形式', V(c.steering)],
             ['外廓尺寸', V(c.dimensions)],
             ['总质量/整备质量', (c.gross_mass || c.curb_weight) ? `${V(c.gross_mass)} / ${V(c.curb_weight)} kg` : dash],
-            ['车身颜色 / 号牌颜色', (c.body_color || c.plate_color) ? `${V(c.body_color)} / ${V(c.plate_color)}` : dash],
+            ['车身颜色', V(c.body_color)],
+            ['号牌颜色', c.plate_color
+              ? esc(c.plate_color)
+              : `<span class="plate-chip pc-${plateKind(c)[0]}">${esc(plateKind(c)[1])}</span>
+                 <span class="muted" style="margin-left:6px">按证载数据推定</span>`],
           ])}
 
           <div class="sub-h">💰 资产台账（财务口径）</div>

@@ -110,6 +110,27 @@ body{margin:0;font-family:var(--font-body);color:var(--ink);background:var(--ora
 .panel-b{padding:0}
 
 /* 紫色强调面板（如提醒中心） */
+/* 车辆卡片按号牌颜色着色：绿=新能源、黄=大中型客车（黄牌）、白=小型（蓝牌）。
+   判定完全来自卡片上的证载数据（燃料种类 / 车辆类型 / 核定载客 / 外廓长度），
+   不额外存字段——数据改了颜色自动跟着改。 */
+.panel.pl-green{background:linear-gradient(178deg,#f4fcf5 0%,#d9f2df 100%);
+  border-color:#7fbe90}
+.panel.pl-green .panel-h{background:linear-gradient(92deg,#e9f9ed,#c6e9d1);border-color:#7fbe90}
+.panel.pl-green .sub-h{background:rgba(255,255,255,.55);border-color:rgba(45,110,65,.18)}
+.panel.pl-green .cert-meta{border-color:rgba(45,110,65,.2)}
+.panel.pl-yellow{background:linear-gradient(178deg,#fffdf2 0%,#fbf0c4 100%);
+  border-color:#d8ba45}
+.panel.pl-yellow .panel-h{background:linear-gradient(92deg,#fdf7d9,#f6e7a6);border-color:#d8ba45}
+.panel.pl-yellow .sub-h{background:rgba(255,255,255,.6);border-color:rgba(140,110,20,.2)}
+.panel.pl-yellow .cert-meta{border-color:rgba(140,110,20,.22)}
+.panel.pl-green table.sub thead th,.panel.pl-yellow table.sub thead th{background:rgba(255,255,255,.7)}
+/* 卡片右上角的小号牌标 */
+.plate-chip{display:inline-flex;align-items:center;padding:2px 9px;border-radius:4px;
+  font-size:11.5px;font-weight:800;letter-spacing:.04em;border:1.5px solid}
+.plate-chip.pc-green{background:linear-gradient(92deg,#e8f8ec,#a8dcb8);border-color:#4f9c68;color:#1d5c33}
+.plate-chip.pc-yellow{background:#f7e07a;border-color:#b8992a;color:#4a3c05}
+.plate-chip.pc-blue{background:#3f6fd8;border-color:#2b4f9e;color:#fff}
+
 .panel.accent{background:var(--purple-deep);color:#fff}
 .panel.accent .panel-h{background:transparent;border-color:rgba(255,255,255,.25);color:#fff}
 
