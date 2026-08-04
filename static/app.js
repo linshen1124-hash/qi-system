@@ -786,6 +786,8 @@ const MODULES = {
       F('cert_building_no', '证载栋号（如 15、16、17）'),
       F('cert_area', '证载建筑面积(㎡)', { type: 'number' }),
       F('cert_status', '权证状态', { type: 'select', options: ['已办结', '办理中', '未办理', '需重新测绘'], def: '已办结' }),
+      F('cert_mark', '证载标记', { type: 'select', full: 1, options: ['证载计面积', '证载不计面积（画叉，拆迁不计补偿）', '未登记'] }),
+      F('asset_card_id', '所属资产卡片（财务口径）', { type: 'ref', ref: 'asset_card', show: 'asset_name', full: 1 }),
       F('actual_area', '实际建筑面积(㎡)', { type: 'number' }),
       F('above_area', '地上面积(㎡)', { type: 'number' }),
       F('under_area', '地下面积(㎡)', { type: 'number' }),
@@ -1879,6 +1881,101 @@ async function renderTenureSheet(body, tenure) {
     openForm('property', list.find(b => b.id == x.dataset.tb)));
 }
 
+/* 资产卡片（财务口径）与幢（后勤口径）的对照表。
+   两套台账拆法不同：财务一张卡片可能含好几幢（如「其他用房（7号楼，锅炉房、车库，平房等）」），
+   安定门更是财务 5 张卡片 ↔ 后勤 12 幢。单卡对不上是正常的，
+   要盯的是**院区级合计**——安定门与亦庄两边都应分毫不差，不等才是真问题。 */
+async function renderAssetCardSheet(body) {
+  body.innerHTML = '<div class="empty">加载中…</div>';
+  const [cards, blds] = await Promise.all([api.get('/asset_card'), api.get('/property')]);
+  const n2 = (v) => v == null ? '' : Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+  const under = (cid) => (blds || []).filter(b => b.asset_card_id == cid);
+  const houses = (cards || []).filter(c => c.unit === '平方米');
+  const lands = (cards || []).filter(c => c.unit !== '平方米');
+  const noCard = (blds || []).filter(b => b.tenure === '自有' && !b.asset_card_id);
+
+  const totalVal = (cards || []).reduce((a, c) => a + (c.original_value || 0), 0);
+  const totalArea = houses.reduce((a, c) => a + (c.area || 0) + (c.area_adjust || 0), 0);
+
+  const row = (c) => {
+    const list = under(c.id);
+    const sumC = list.reduce((a, b) => a + (b.cert_area || 0), 0);
+    const net = (c.area || 0) + (c.area_adjust || 0);
+    return `<tr>
+      <td><b>${esc(c.asset_no)}</b><div class="muted">${esc(c.asset_name)}</div></td>
+      <td class="muted">${esc(c.group_name || '')}</td>
+      <td class="num">${n2(c.area)}${c.area_adjust
+        ? `<div class="muted">调整 ${n2(c.area_adjust)} → ${n2(net)}</div>` : ''}</td>
+      <td class="num">${sumC ? n2(sumC) : '<span class="muted">—</span>'}</td>
+      <td class="wrapcol">${list.length
+        ? list.map(b => esc(b.building)).join('、')
+        : '<span class="tag warn">未关联幢</span>'}</td>
+      <td class="num">${money(c.original_value)}</td>
+      <td class="muted">${esc(c.cert_no_txt || c.has_cert || '')}</td>
+      <td class="actions"><button class="btn link sm" data-edit-a="${c.id}">编辑</button></td></tr>`;
+  };
+
+  // 院区级核对：财务卡片合计 vs 后勤证载合计
+  const groups = [...new Set(houses.map(c => c.group_name).filter(Boolean))];
+  const recon = groups.map(g => {
+    const cs = houses.filter(c => c.group_name === g);
+    const cardSum = cs.reduce((a, c) => a + (c.area || 0) + (c.area_adjust || 0), 0);
+    const certSum = cs.reduce((a, c) => a + under(c.id).reduce((x, b) => x + (b.cert_area || 0), 0), 0);
+    const gap = cardSum - certSum;
+    return `<tr><td><b>${esc(g)}</b></td><td class="num">${n2(cardSum)}</td>
+      <td class="num">${n2(certSum)}</td>
+      <td>${Math.abs(gap) < 0.01
+        ? '<span class="tag ok">分毫不差</span>'
+        : `<span class="tag danger">差 ${n2(gap)}㎡</span>`}</td></tr>`;
+  }).join('');
+
+  body.innerHTML = `
+    <div class="hint">院资产管理系统（财务）口径的房产与土地台账。
+      <b>与幢台账拆法不同、不作合并</b>——一张卡片可含多幢，单卡面积对不上属正常。
+      真正要盯的是下面这张院区级核对表。</div>
+    <div class="mini-cards">
+      <div class="mini-card"><div class="mk-k">资产卡片</div><div class="mk-v">${(cards || []).length}<small> 张</small></div></div>
+      <div class="mini-card"><div class="mk-k">房屋面积(账面)</div><div class="mk-v">${n2(Math.round(totalArea))}<small> ㎡</small></div></div>
+      <div class="mini-card"><div class="mk-k">资产原值</div><div class="mk-v">${(totalVal / 1e8).toFixed(2)}<small> 亿</small></div></div>
+      <div class="mini-card"><div class="mk-k">自有幢未挂卡片</div><div class="mk-v">${noCard.length}<small> 幢</small></div></div>
+    </div>
+
+    <div class="panel"><div class="panel-h"><h2 style="font-size:15px">
+      <span class="ic">${icon('scale')}</span>院区级核对 · 财务账面 vs 后勤证载</h2></div>
+      <div class="panel-b"><div style="overflow-x:auto"><table class="sub"><thead><tr>
+        <th>院区/分组</th><th class="num">卡片账面㎡</th><th class="num">所含幢证载㎡</th><th>核对</th>
+      </tr></thead><tbody>${recon}</tbody></table></div></div></div>
+
+    <div class="panel"><div class="panel-h"><h2 style="font-size:15px">
+      <span class="ic">${icon('home')}</span>房屋卡片 <span class="tag">${houses.length}</span></h2></div>
+      <div class="panel-b"><div style="overflow-x:auto"><table class="sub"><thead><tr>
+        <th>资产编号/名称</th><th>分组</th><th class="num">账面面积㎡</th><th class="num">所含幢证载㎡</th>
+        <th>所含幢</th><th class="num">资产原值</th><th>房产证号</th><th></th>
+      </tr></thead><tbody>${houses.map(row).join('')}</tbody></table></div></div></div>
+
+    <div class="panel"><div class="panel-h"><h2 style="font-size:15px">
+      <span class="ic">${icon('flag')}</span>土地卡片 <span class="tag">${lands.length}</span></h2></div>
+      <div class="panel-b"><div style="overflow-x:auto"><table class="sub"><thead><tr>
+        <th>资产编号/名称</th><th>分组</th><th class="num">数量/面积</th><th class="num"></th>
+        <th>所含幢</th><th class="num">资产原值</th><th>权证号</th><th></th>
+      </tr></thead><tbody>${lands.map(row).join('')}</tbody></table></div></div></div>
+
+    ${noCard.length ? `<div class="panel"><div class="panel-h"><h2 style="font-size:15px">
+      <span class="ic">${icon('home')}</span>自有但未挂资产卡片
+      <span class="tag warn">${noCard.length} 幢</span></h2></div>
+      <div class="panel-b"><div class="hint" style="margin:12px">
+        这些幢在财务资产台账里没有对应卡片——要么尚未入账，要么被并在别的卡片里没拆出来。</div>
+      <div style="overflow-x:auto"><table class="sub"><thead><tr>
+        <th>院区</th><th>楼号/名称</th><th class="num">证载㎡</th><th class="num">实际㎡</th><th>证载标记</th>
+      </tr></thead><tbody>${noCard.map(b => `<tr>
+        <td class="muted">${esc(b.campus)}</td><td><b>${esc(b.building)}</b></td>
+        <td class="num">${n2(b.cert_area)}</td><td class="num">${n2(b.actual_area)}</td>
+        <td>${esc(b.cert_mark || '')}</td></tr>`).join('')}</tbody></table></div></div></div>` : ''}`;
+
+  body.querySelectorAll('[data-edit-a]').forEach(b => b.onclick = () =>
+    openForm('asset_card', (cards || []).find(c => c.id == b.dataset.editA)));
+}
+
 /* 事层：对房子做了什么。修缮是工程，登记是有周期的事务（我院安定门证
    自 2017 年办到 2018 年卡在测绘条件至今），两者都属"事"。 */
 async function viewRepair() {
@@ -2130,7 +2227,7 @@ async function viewProperty() {
     const b = el(`<button class="btn primary">${icon('plus')}新增资产卡片</button>`);
     b.onclick = () => openForm('asset_card', null);
     actions.appendChild(b);
-    return renderModuleTable('asset_card', $('#pv-body'));
+    return renderAssetCardSheet($('#pv-body'));
   }
   if (sub === 'rent' || sub === 'borrow') {
     const t = sub === 'rent' ? '租入' : '借用代管';
@@ -2146,9 +2243,10 @@ async function viewProperty() {
   actions.appendChild(addCert); actions.appendChild(addBld);
 
   const view2 = $('#pv-body'); view2.innerHTML = '<div class="empty">加载中…</div>';
-  const [certs, blds] = await Promise.all([
-    api.get('/property_cert'), api.get('/property'),
+  const [certs, blds, cards] = await Promise.all([
+    api.get('/property_cert'), api.get('/property'), api.get('/asset_card'),
   ]);
+  const cardOf = (b) => (cards || []).find(c => c.id == b.asset_card_id);
 
   const n2 = (v) => v == null ? '' : Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
   const under = (cid) => (blds || []).filter(b => b.cert_id == cid);
@@ -2163,19 +2261,29 @@ async function viewProperty() {
     const sumA = list.reduce((a, b) => a + (b.actual_area || 0), 0);
     // 证载合计与各幢证载之和应当相等，不等就是漏挂或错挂
     const gap = cert ? (cert.building_area || 0) - sumC : 0;
+    // 证载不计面积的（证上画叉）与未登记的，用标记点明——它们不进证载合计是正常的
+    const mark = (b) => {
+      if (!b.cert_mark || b.cert_mark === '证载计面积') return '';
+      const danger = b.cert_mark === '未登记';
+      return `<span class="tag ${danger ? 'danger' : 'warn'}">${esc(
+        b.cert_mark.replace('证载不计面积（画叉，拆迁不计补偿）', '证上画叉·不计补偿'))}</span>`;
+    };
     return `<table class="sub"><thead><tr>
         <th>楼号/名称</th><th>权属</th><th>用途</th><th>证载栋号</th>
         <th class="num">证载㎡</th><th class="num">实际㎡</th>
-        <th>层数</th><th>建成</th><th></th></tr></thead><tbody>
-      ${list.map(b => `<tr>
-        <td><b>${esc(b.building)}</b></td>
+        <th>资产卡片</th><th>层数</th><th></th></tr></thead><tbody>
+      ${list.map(b => { const cd = cardOf(b); return `<tr>
+        <td><b>${esc(b.building)}</b> ${mark(b)}</td>
         <td><span class="tag ${b.tenure === '自有' ? '' : 'ct-land'}">${esc(b.tenure || '自有')}</span></td>
         <td class="muted">${esc(b.usage_type || '')}</td>
         <td>${esc(b.cert_building_no || '')}</td>
         <td class="num">${n2(b.cert_area)}</td>
         <td class="num">${n2(b.actual_area)}</td>
-        <td>${esc(b.floors || '')}</td><td>${esc(b.built_year || '')}</td>
-        <td class="actions"><button class="btn link sm" data-edit-b="${b.id}">编辑</button></td></tr>`).join('')}
+        <td class="muted wrapcol">${cd
+          ? `${esc(cd.asset_no)} <span class="muted">${esc(cd.asset_name)}</span>`
+          : '<span class="tag warn">无资产卡片</span>'}</td>
+        <td>${esc(b.floors || '')}</td>
+        <td class="actions"><button class="btn link sm" data-edit-b="${b.id}">编辑</button></td></tr>`; }).join('')}
       <tr style="background:var(--surface-dim);font-weight:700">
         <td colspan="4">小计 ${list.length} 幢</td>
         <td class="num">${n2(sumC)}</td><td class="num">${n2(sumA)}</td>
