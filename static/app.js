@@ -1890,12 +1890,13 @@ async function renderAssetCardSheet(body) {
   const [cards, blds] = await Promise.all([api.get('/asset_card'), api.get('/property')]);
   const n2 = (v) => v == null ? '' : Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
   const under = (cid) => (blds || []).filter(b => b.asset_card_id == cid);
-  const houses = (cards || []).filter(c => c.unit === '平方米');
-  const lands = (cards || []).filter(c => c.unit !== '平方米');
+  // 亦庄土地卡片的计量单位也是平方米，按会计科目分才分得开
+  const houses = (cards || []).filter(c => c.acct_subject === '固定资产');
+  const lands = (cards || []).filter(c => c.acct_subject !== '固定资产');
   const noCard = (blds || []).filter(b => b.tenure === '自有' && !b.asset_card_id);
 
   const totalVal = (cards || []).reduce((a, c) => a + (c.original_value || 0), 0);
-  const totalArea = houses.reduce((a, c) => a + (c.area || 0) + (c.area_adjust || 0), 0);
+  const totalArea = houses.reduce((a, c) => a + (c.area || 0), 0);
 
   const row = (c) => {
     const list = under(c.id);
@@ -1915,18 +1916,25 @@ async function renderAssetCardSheet(body) {
       <td class="actions"><button class="btn link sm" data-edit-a="${c.id}">编辑</button></td></tr>`;
   };
 
-  // 院区级核对：财务卡片合计 vs 后勤证载合计
+  // 院区级核对：财务账面 vs 后勤证载。
+  // 用 area 而不是 area+adjust——安定门那 -213.7 是两本证之间的挪动，不是净减，
+  // Excel 自己的合计行也是 14759 + 213.7 = 14972.7 这样处理的。
   const groups = [...new Set(houses.map(c => c.group_name).filter(Boolean))];
   const recon = groups.map(g => {
     const cs = houses.filter(c => c.group_name === g);
-    const cardSum = cs.reduce((a, c) => a + (c.area || 0) + (c.area_adjust || 0), 0);
-    const certSum = cs.reduce((a, c) => a + under(c.id).reduce((x, b) => x + (b.cert_area || 0), 0), 0);
+    const cardSum = cs.reduce((a, c) => a + (c.area || 0), 0);
+    const bs = cs.flatMap(c => under(c.id));
+    const certSum = bs.reduce((a, b) => a + (b.cert_area || 0), 0);
     const gap = cardSum - certSum;
+    // 整组都没办证的，证载为 0 是应该的，不算差错
+    const allUnreg = bs.length > 0 && bs.every(b => b.cert_mark === '未登记');
     return `<tr><td><b>${esc(g)}</b></td><td class="num">${n2(cardSum)}</td>
-      <td class="num">${n2(certSum)}</td>
+      <td class="num">${certSum ? n2(certSum) : '<span class="muted">—</span>'}</td>
       <td>${Math.abs(gap) < 0.01
         ? '<span class="tag ok">分毫不差</span>'
-        : `<span class="tag danger">差 ${n2(gap)}㎡</span>`}</td></tr>`;
+        : allUnreg
+          ? '<span class="tag">未办证 · 无证载可比</span>'
+          : `<span class="tag danger">差 ${n2(gap)}㎡</span>`}</td></tr>`;
   }).join('');
 
   body.innerHTML = `
