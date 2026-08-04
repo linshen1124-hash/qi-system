@@ -263,6 +263,10 @@ thead th:last-child{position:sticky;right:0;background:var(--purple-deep);border
   padding:14px 20px;border-bottom:2px solid rgba(22,28,39,.12);font-size:12.5px}
 .cert-meta span.full{grid-column:1/-1}
 .cert-meta b{font-weight:700;margin-right:6px;color:var(--muted)}
+/* 展开面板内的分区标题：把一辆车的登记证书/行驶证/资产/保险几段分开 */
+.sub-h{padding:12px 20px 6px;font-size:12.5px;font-weight:800;letter-spacing:.03em;
+  color:var(--ink);background:var(--surface-dim);border-top:1px solid rgba(22,28,39,.10)}
+.panel-b > .sub-h:first-child{border-top:0}
 table.sub{width:100%;border-collapse:collapse;font-size:13px}
 /* 需显式覆盖全局 thead 的紫底白字，否则子表表头是白字落浅底、看不见 */
 table.sub thead tr{background:var(--surface)}

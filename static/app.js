@@ -230,6 +230,28 @@ const MODULES = {
       F('inspection_expire', '检验有效期至', { type: 'date' }),
       F('retirement_date', '强制报废期止', { type: 'date' }),
       F('active', '在用', { type: 'bool', def: 1 }),
+      F('reg_cert_no', '机动车登记证书编号（大绿本）'),
+      F('first_reg_date', '初次登记日期', { type: 'date' }),
+      F('owner_id_type', '身份证明名称'),
+      F('owner_id_no', '身份证明号码'),
+      F('acquire_way', '车辆获得方式', { type: 'select', options: ['购买', '调拨', '接受捐赠', '继承', '其他'] }),
+      F('reg_org', '登记机关'),
+      F('mortgage_state', '抵押状态', { type: 'select', options: ['未抵押', '已抵押', '已解除抵押'] }),
+      F('body_color', '车身颜色'),
+      F('plate_color', '号牌颜色', { type: 'select', options: ['蓝色', '黄色', '黄绿渐变（新能源）', '白色', '黑色'] }),
+      F('reg_cert_file', '登记证书扫描件', { full: 1 }),
+      F('model_code', '车辆型号（证书第7项）'),
+      F('manufacturer', '制造厂名称'),
+      F('origin', '国产/进口', { type: 'select', options: ['国产', '进口'] }),
+      F('mfg_date', '车辆出厂日期', { type: 'date' }),
+      F('engine_model', '发动机型号'),
+      F('power_kw', '功率(kW)', { type: 'number' }),
+      F('wheelbase', '轴距(mm)', { type: 'number' }),
+      F('track_fr', '轮距 前/后(mm)'),
+      F('tire_spec', '轮胎规格'),
+      F('tire_count', '轮胎数', { type: 'number' }),
+      F('axle_count', '轴数', { type: 'number' }),
+      F('steering', '转向形式'),
       F('asset_no', '院系统资产编号'),
       F('integrated_no', '一体化编号'),
       F('asset_ref_id', '一体化系统ID'),
@@ -239,6 +261,26 @@ const MODULES = {
       F('notes', '备注', { full: 1 }),
     ],
     hint: '资产编号、一体化编号、原值来自院资产管理系统《现存实有车辆信息》；VIN 与发动机号为完整值。',
+  },
+  // 大绿本背面逐条盖章的登记业务。属"权"层的历史，不是"事"层的业务办理。
+  vehicle_reg_record: {
+    title: '车辆登记业务', table: 'vehicle_reg_record', icon: '📗',
+    hint: '机动车登记证书上逐条记载的登记业务：初次登记、转移登记、抵押/解除抵押、变更、注销。在「车辆档案」展开某辆车即可看到该车的完整记录。',
+    columns: [['plate', '车牌'], ['seq_no', '序号'], ['reg_type', '登记类型'], ['reg_date', '登记日期'], ['owner_after', '转移后所有人'], ['counterparty', '相对方'], ['reg_org', '登记机关']],
+    fields: [
+      F('vehicle_id', '车辆', { type: 'ref', ref: 'vehicle', show: 'plate', req: 1, full: 1 }),
+      F('seq_no', '证书记录序号', { type: 'number' }),
+      F('reg_type', '登记类型', { type: 'select', req: 1, options: ['初次登记', '转移登记', '变更登记', '抵押登记', '解除抵押登记', '质押备案', '解除质押备案', '注销登记', '转入', '转出'] }),
+      F('reg_date', '登记日期', { type: 'date' }),
+      F('owner_before', '转移前所有人'),
+      F('owner_after', '转移后所有人'),
+      F('counterparty', '相对方（抵押权人等）'),
+      F('reg_org', '登记机关'),
+      F('doc_no', '业务/凭证编号'),
+      F('amount', '涉及金额(元)', { type: 'number' }),
+      F('source_file', '来源文件', { full: 1 }),
+      F('notes', '备注', { full: 1 }),
+    ],
   },
   trip_record: {
     title: '行车记录', table: 'trip_record', icon: '🛣️',
@@ -894,6 +936,7 @@ function route() {
   if (key === 'property') return viewProperty();
   if (key === 'property_fee') return viewLedger();
   if (key === 'repair') return viewRepair();
+  if (key === 'vehicle') return viewVehicle();
   if (key === 'vehicle_expense') return viewVehicleCost();
   if (key === 'vehicle_task') return viewVehicleTask();
   if (key === 'trip_record') return viewTripMgmt();
@@ -1260,6 +1303,187 @@ const VTASK = [
   { key: '事故', icon: '⚠️', desc: '出现事故应急处理并向物业管理中心报告（第十条）。公车均投高额商业险，赔付不构成院方支出。' },
   { key: '卡务', icon: '💳', desc: '油卡一车一卡、由物业管理中心统一管理；现金加油须分管院领导批准报销（第八条）。' },
 ];
+
+/* 权层：车是谁的。对齐房产的"证→幢"，车辆是"车→登记业务流水"。
+   大绿本（登记证书）是权属凭证，行驶证只是随车上路凭证——两者分区展示，
+   哪一栏是空的一眼能看出来，避免"字段建了但没数据"的规则空转。 */
+async function viewVehicle() {
+  setTitle('vehicle', '车辆档案');
+  const actions = $('#topbar-actions'); actions.innerHTML = '';
+  const addV = el(`<button class="btn primary">${icon('plus')}新增车辆</button>`);
+  addV.onclick = () => openForm('vehicle', null);
+  actions.appendChild(addV);
+
+  const view = $('#view');
+  view.innerHTML = '<div class="empty">加载中…</div>';
+  const [cars, regs] = await Promise.all([
+    api.get('/vehicle'), api.get('/vehicle_reg_record'),
+  ]);
+  const list = (cars || []).slice().sort((a, b) =>
+    (b.active === true) - (a.active === true) || String(a.plate).localeCompare(String(b.plate)));
+
+  const today = new Date().toISOString().slice(0, 10);
+  const dash = '<span class="muted">—</span>';
+  const V = (v) => (v == null || v === '') ? dash : esc(String(v));
+  // 到期类字段统一走这里：过期红、90 天内黄、空则明说"未录"，不要留白
+  const due = (d, label) => {
+    if (!d) return `<span class="tag warn">未录${label || ''}</span>`;
+    const days = Math.round((new Date(d) - new Date(today)) / 86400000);
+    if (days < 0) return `<span class="tag danger">${esc(d)} · 已逾期${-days}天</span>`;
+    if (days <= 90) return `<span class="tag warn">${esc(d)} · 剩${days}天</span>`;
+    return `<span class="tag ok">${esc(d)}</span>`;
+  };
+
+  const kv = (rows) => `<div class="cert-meta">${rows
+    .map(([k, v, full]) => `<span class="${full ? 'full' : ''}"><b>${k}</b> ${v}</span>`).join('')}</div>`;
+
+  const regsOf = (id) => (regs || []).filter(r => r.vehicle_id == id)
+    .sort((a, b) => String(a.reg_date || '').localeCompare(String(b.reg_date || '')));
+
+  const regTable = (rs) => {
+    if (!rs.length) return `<div class="hint">登记证书上的登记业务记录尚未录入。
+      大绿本背面逐条盖章的初次登记、转移登记、抵押/解除抵押等应录在这里。</div>`;
+    return `<table class="sub"><thead><tr>
+        <th>序号</th><th>登记类型</th><th>登记日期</th><th>转移前所有人</th>
+        <th>转移后所有人</th><th>相对方</th><th>登记机关</th><th></th></tr></thead><tbody>
+      ${rs.map(r => `<tr>
+        <td>${V(r.seq_no)}</td>
+        <td><span class="tag">${esc(r.reg_type || '')}</span></td>
+        <td>${V(r.reg_date)}</td>
+        <td class="muted wrapcol">${V(r.owner_before)}</td>
+        <td class="muted wrapcol">${V(r.owner_after)}</td>
+        <td class="muted">${V(r.counterparty)}</td>
+        <td class="muted">${V(r.reg_org)}</td>
+        <td class="actions"><button class="btn link sm" data-edit-r="${r.id}">编辑</button></td>
+      </tr>`).join('')}</tbody></table>`;
+  };
+
+  const card = (c) => {
+    const rs = regsOf(c.id);
+    return `
+      <div class="panel" style="margin-bottom:14px">
+        <div class="panel-h" style="cursor:pointer" data-toggle="v${c.id}">
+          <h2 style="font-size:15px">
+            <span class="ic">${icon('vehicle')}</span>
+            ${esc(c.plate)}
+            ${c.brand ? `<span class="tag">${esc(c.brand)}</span>` : ''}
+            ${c.use_nature_cn ? `<span class="tag ct-house">${esc(c.use_nature_cn)}</span>` : ''}
+            ${c.active === false ? '<span class="tag danger">已停用</span>' : ''}
+          </h2>
+          <div style="display:flex;gap:14px;align-items:center;font-size:12.5px">
+            <span class="muted">${c.reg_cert_no
+              ? '绿本 ' + esc(c.reg_cert_no)
+              : '<span class="tag warn">无登记证书</span>'}</span>
+            <span>年检 ${due(c.inspection_expire, '年检')}</span>
+            <button class="btn link sm" data-edit-v="${c.id}">编辑</button>
+            <span class="caret" id="caret-v${c.id}">▸</span>
+          </div>
+        </div>
+        <div class="panel-b" id="body-v${c.id}" hidden>
+
+          <div class="sub-h">📗 机动车登记证书（大绿本）· 权属凭证</div>
+          ${kv([
+            ['证书编号', V(c.reg_cert_no)],
+            ['初次登记日期', V(c.first_reg_date)],
+            ['机动车所有人', V(c.owner_name)],
+            ['身份证明', c.owner_id_type ? esc(c.owner_id_type) + ' ' + esc(c.owner_id_no || '') : dash],
+            ['车辆获得方式', V(c.acquire_way)],
+            ['登记机关', V(c.reg_org)],
+            ['抵押状态', c.mortgage_state
+              ? `<span class="tag ${/已抵押|抵押中/.test(c.mortgage_state) ? 'danger' : 'ok'}">${esc(c.mortgage_state)}</span>`
+              : dash],
+            ['权属来源', V(c.tenure)],
+            ['住址', V(c.owner_address), 1],
+            ['证书扫描件', V(c.reg_cert_file), 1],
+          ])}
+          <div style="overflow-x:auto;margin-top:6px">${regTable(rs)}</div>
+
+          <div class="sub-h">📘 行驶证 · 上路凭证</div>
+          ${kv([
+            ['车辆类型', V(c.vehicle_type)],
+            ['厂牌型号', V(c.model)],
+            ['车辆识别代号', V(c.vin)],
+            ['发动机号', V(c.engine_no)],
+            ['注册日期', V(c.registration_date)],
+            ['发证日期', V(c.issue_date)],
+            ['使用性质', V(c.use_nature)],
+            ['核定载人数', V(c.seating_capacity)],
+            ['检验有效期至', due(c.inspection_expire, '年检')],
+            ['强制报废期止', V(c.retirement_date)],
+          ])}
+
+          <div class="sub-h">🔧 车辆技术参数</div>
+          ${kv([
+            ['车辆型号', V(c.model_code)],
+            ['制造厂名称', V(c.manufacturer)],
+            ['国产/进口', V(c.origin)],
+            ['车辆出厂日期', V(c.mfg_date)],
+            ['发动机型号', V(c.engine_model)],
+            ['排量', V(c.displacement)],
+            ['功率', c.power_kw ? esc(c.power_kw) + ' kW' : dash],
+            ['燃料种类', V(c.fuel_type)],
+            ['轴距', c.wheelbase ? esc(c.wheelbase) + ' mm' : dash],
+            ['轮距', V(c.track_fr)],
+            ['轮胎规格', V(c.tire_spec)],
+            ['轮胎数 / 轴数', (c.tire_count || c.axle_count) ? `${V(c.tire_count)} / ${V(c.axle_count)}` : dash],
+            ['转向形式', V(c.steering)],
+            ['外廓尺寸', V(c.dimensions)],
+            ['总质量/整备质量', (c.gross_mass || c.curb_weight) ? `${V(c.gross_mass)} / ${V(c.curb_weight)} kg` : dash],
+            ['车身颜色 / 号牌颜色', (c.body_color || c.plate_color) ? `${V(c.body_color)} / ${V(c.plate_color)}` : dash],
+          ])}
+
+          <div class="sub-h">💰 资产台账（财务口径）</div>
+          ${kv([
+            ['院系统资产编号', V(c.asset_no)],
+            ['一体化编号', V(c.integrated_no)],
+            ['批次号', V(c.batch_no)],
+            ['资产原值', c.original_value ? money(c.original_value) : dash],
+            ['资产管理人', V(c.asset_manager)],
+          ])}
+
+          <div class="sub-h">🎫 保险与卡证</div>
+          ${kv([
+            ['交强险到期', due(c.ctp_expire, '交强险')],
+            ['商业险到期', due(c.insurance_expire, '商业险')],
+            ['承保公司', V(c.insurer)],
+            ['加油卡号', V(c.fuel_card_no)],
+            ['ETC 卡号', V(c.etc_no)],
+          ])}
+
+          ${c.notes ? `<div class="hint" style="margin-top:10px">${esc(c.notes)}</div>` : ''}
+        </div>
+      </div>`;
+  };
+
+  const noCert = list.filter(c => !c.reg_cert_no).length;
+  const overdue = list.filter(c => c.inspection_expire && c.inspection_expire < today).length;
+  const value = list.reduce((a, c) => a + (c.original_value || 0), 0);
+
+  view.innerHTML = `
+    <div class="hint">车辆的「权」层。<b>大绿本（机动车登记证书）才是权属凭证</b>，
+      行驶证只是随车上路凭证——两者分开展示。点击任一车辆展开全部登记信息。</div>
+    <div class="mini-cards">
+      <div class="mini-card"><div class="mk-k">车辆</div><div class="mk-v">${list.length}<small> 辆</small></div></div>
+      <div class="mini-card"><div class="mk-k">未录登记证书</div><div class="mk-v">${noCert}<small> 辆</small></div></div>
+      <div class="mini-card"><div class="mk-k">年检已逾期</div><div class="mk-v">${overdue}<small> 辆</small></div></div>
+      <div class="mini-card"><div class="mk-k">资产原值</div><div class="mk-v">${(value / 10000).toFixed(2)}<small> 万</small></div></div>
+    </div>
+    ${list.map(card).join('')}`;
+
+  view.querySelectorAll('[data-toggle]').forEach(h => h.onclick = (e) => {
+    if (e.target.closest('[data-edit-v]')) return;
+    const k = h.dataset.toggle;
+    const body = view.querySelector('#body-' + k);
+    body.hidden = !body.hidden;
+    view.querySelector('#caret-' + k).textContent = body.hidden ? '▸' : '▾';
+  });
+  view.querySelectorAll('[data-edit-v]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    openForm('vehicle', list.find(c => c.id == b.dataset.editV));
+  });
+  view.querySelectorAll('[data-edit-r]').forEach(b => b.onclick = () =>
+    openForm('vehicle_reg_record', (regs || []).find(r => r.id == b.dataset.editR)));
+}
 
 async function viewVehicleTask() {
   setTitle('vehicle_task', '车务事项');
